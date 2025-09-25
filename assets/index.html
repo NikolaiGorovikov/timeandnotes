@@ -1,0 +1,888 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Exam Time & Announcements Board</title>
+  <style>
+    /* ===== Base / Layout ===== */
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: #fff;
+      color: #000;
+      font-family: "Inter";
+      line-height: 1.2;
+      -webkit-font-smoothing: antialiased;
+      font-variant-numeric: tabular-nums; /* avoid digit width jitter if supported */
+    }
+
+    :root {
+      --board-pad: clamp(10px, 1.5vw, 28px);
+      --block-gap: clamp(8px, 1.5vw, 20px);
+      --block-pad: clamp(8px, 1.25vw, 16px);
+      --radius: 12px;
+
+      /* Time sizes (user adjustable) */
+      --time-base: 16vw;              /* main HH:MM size basis */
+      --time-side-ratio: 0.36;        /* AM/PM + SS size vs HH:MM */
+      --time-scale: 1;                /* auto vertical fit scaling */
+      --time-width-scale: 1;          /* auto scale to fit width on one line */
+
+      /* Note sizes (per-note base is inline via style="--note-base: Npx") */
+      --note-scale-global: 1;         /* auto vertical fit scaling for notes */
+      --note-min: 14px;               /* floor for tiny squeeze */
+    }
+
+    @font-face {
+      font-family: 'Inter';
+      src: url('./fonts/inter.ttf') format('truetype');
+      font-weight: 600;
+      font-style: normal;
+    }
+
+    @font-face {
+      font-family: 'Roboto Slab';
+      src: url('./fonts/RobotoSlab.ttf') format('truetype');
+      font-weight: 600;
+      font-style: normal;
+    }
+
+    #board {
+      height: 100dvh; /* use dynamic viewport units for mobile bars */
+      padding: var(--board-pad);
+      display: flex;
+      flex-direction: column;
+      gap: var(--block-gap);
+    }
+
+    #notes {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: calc(var(--block-gap) / 1.5);
+    }
+
+    .block {
+      position: relative;
+      border-radius: var(--radius);
+      padding: var(--block-pad);
+      border: 1px solid rgba(0,0,0,0.05);
+      /* Lightweight subtle elevation without stealing attention */
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.03), 0 1px 2px rgba(0,0,0,0.04);
+      background: #fff;
+    }
+
+    /* ===== Controls on hover ===== */
+    .controls{
+      position: absolute;
+      inset: 6px 8px auto auto; /* top-right */
+      display: flex;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 10px;
+      border: 1px solid rgba(0,0,0,0.08);
+      align-items: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 150ms ease;
+      backdrop-filter: blur(2px);
+    }
+
+    .note .controls{
+      padding: 0 0 0 0;
+      border: none;
+      shadow: none;
+    }
+
+    .controls *{
+      font-family: Inter;!important;
+    }
+
+    .note{
+
+      font-family: 'Roboto Slab'; !important;
+    }
+
+    .block:hover .controls,
+    .block[data-editing="true"] .controls,
+    .block:has(:focus-visible) .controls {
+      opacity: 1; pointer-events: auto;
+    }
+
+    .controls label, .controls input, .controls .toggle {
+      font: inherit;
+    }
+    .controls input[type="range"] {
+      width: clamp(120px, 20vw, 260px);
+    }
+    .controls .group { display: inline-flex; gap: 8px; align-items: center; }
+
+    .btn {
+      border: 1px solid rgba(0,0,0,0.15);
+      background: #fff;
+      padding: 5px;
+      border-radius: 8px;
+      cursor: pointer;
+      box-sizing: content-box;
+      font-size: 12px;
+      height: 12px;
+    }
+    .btn:hover { background: #f6f6f6; }
+    .btn.danger { color: #b00020; border-color: rgba(176,0,32,0.25); }
+    .btn.ghost { border-color: rgba(0,0,0,0.12); background: transparent; }
+
+    /* ===== Time block ===== */
+    .time-block {
+      display: grid;
+      place-items: center;
+    }
+    .time-wrap {
+      white-space: nowrap;
+      transform: scale(var(--time-width-scale));
+      transform-origin: center top;
+      will-change: transform;
+    }
+    .time {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.05em;
+      line-height: 1;
+      justify-content: center;
+      user-select: none;
+      /* main size (subject to global vertical fit scaling as well) */
+      font-size: calc(var(--time-base) * var(--time-scale));
+    }
+    .time .main {
+      display: inline-flex;
+      align-items: baseline;
+      font-weight: 600;
+    }
+    .time .main .seg {
+      display: inline-block;
+      min-width: 2ch; /* reserve width; combined with tabular-nums prevents shaking */
+      text-align: center;
+    }
+    .time .colon { display: inline-block; padding: 0 0.02em; transform: translateY(calc((-1)*var(--time-base)/11)); }
+    .time .side {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.10em;
+      font-size: calc(var(--time-base) * var(--time-side-ratio) * var(--time-scale) * 1.17);
+      font-weight: 600;
+      line-height: 0.9;
+      padding-right: calc(var(--time-base) * var(--time-side-ratio) * var(--time-scale) * 0.24);
+    }
+    .time .ampm, .time .sec {
+      min-width: 2ch; text-align: center;
+    }
+
+    /* Visual cues when editing the time */
+    .time .seg[aria-selected="true"] {
+      outline: 2px solid #0b57d0; /* blue ring */
+      outline-offset: 2px;
+      border-radius: 6px;
+      background: rgba(11,87,208,0.08);
+    }
+    .time-block[data-mode="countdown"] .ampm::after {
+      content: "LEFT"; font-size: 0.66em; letter-spacing: 0.08em;
+      display: block; opacity: 0.7; margin-top: 0.25em;
+    }
+
+    /* ===== Note blocks ===== */
+    .note {
+      font-size: calc(var(--note-base, 64px) * var(--note-scale-global));
+    }
+    .note .content {
+      outline: none;
+      word-break: break-word;
+    }
+    .note[data-default="true"] .content {
+      color: #8c8c8c;
+      font-style: italic;
+    }
+
+    /* ===== Activity helper (Add note prompt) ===== */
+    #hud {
+      position: fixed;
+      width: 100%;
+      bottom: 14px;
+      left: 0;
+      display: flex;
+      padding: 0 7%;
+    }
+    #hud.visible p { opacity: 1; pointer-events: auto; cursor: pointer; }
+    #hud p {
+      margin: auto;
+      background: rgba(255,255,255,0.95);
+      border: 1px solid rgba(0,0,0,0.12);
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-size: 14px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 200ms ease;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+      text-align: center;
+    }
+
+    /* Subtle help badge while editing time */
+    .badge {
+      position: absolute;
+      left: 12px; top: 12px;
+      padding: 4px 8px; border-radius: 999px;
+      background: #0b57d0; color: #fff; font-size: 12px;
+      opacity: 0; transition: opacity 150ms ease;
+    }
+    .time-block[data-editing="true"] .badge { opacity: 1; }
+
+    button{
+      font-family: Inter;!important;
+      font-size: 12px;
+      height: 20px;
+      line-height: 1;
+    }
+
+    .size-btn {
+      font-size: 12px;
+      height: 12px;
+      line-height: 0.7;
+      width: 12px;
+      padding: 5px; !important;
+      box-sizing: content-box;
+    }
+
+    .plus-minus-btns{
+      display: flex;
+      flex-direction: row;
+      gap: 5px;
+    }
+
+    .btn:active {
+      background-color: rgba(0,0,0,0.15);
+    }
+
+    .btn.danger:active{
+      background-color: rgba(176,0,32,0.25);
+    }
+
+    /* Responsiveness / accessibility tweaks */
+    @media (pointer: coarse) {
+      .controls { inset: auto auto 10px 10px; } /* place controls bottom-left on touch devices */
+    }
+
+   @media (max-width: 550px) {
+     .time {
+       font-size: calc(var(--time-base) * var(--time-scale) * 0.93);
+     }
+     .time .side {
+       font-size: calc(var(--time-base) * var(--time-side-ratio) * var(--time-scale) * 1.17 * 0.93);
+       padding-right: calc(var(--time-base) * var(--time-side-ratio) * var(--time-scale) * 0.24 * 0.93);
+     }
+   }
+
+    @media (max-width: 350px) {
+      .time {
+        font-size: calc(var(--time-base) * var(--time-scale) * 0.85);
+      }
+      .time .side {
+        font-size: calc(var(--time-base) * var(--time-side-ratio) * var(--time-scale) * 1.17 * 0.85);
+        padding-right: calc(var(--time-base) * var(--time-side-ratio) * var(--time-scale) * 0.24 * 0.85);
+      }
+    }
+
+    @media (max-width: 280px) {
+      .time {
+        font-size: calc(var(--time-base) * var(--time-scale) * 0.8);
+      }
+      .time .side {
+        font-size: calc(var(--time-base) * var(--time-side-ratio) * var(--time-scale) * 1.17 * 0.8);
+        padding-right: calc(var(--time-base) * var(--time-side-ratio) * var(--time-scale) * 0.24 * 0.8);
+      }
+    }
+
+    @media (max-width: 190px) {
+      .time {
+        font-size: calc(var(--time-base) * var(--time-scale) * 0.77);
+      }
+      .time .side {
+        font-size: calc(var(--time-base) * var(--time-side-ratio) * var(--time-scale) * 1.17 * 0.77);
+        padding-right: calc(var(--time-base) * var(--time-side-ratio) * var(--time-scale) * 0.24 * 0.77);
+      }
+    }
+
+    .time-resize-handle {
+      position: absolute;
+      width: 5vw;
+      height: 1vw;
+      bottom: -0.5vw;                 /* sit just outside so they don't affect height */
+      border-color: #000;
+      background-color: #000;
+      border-radius: 4px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 120ms ease;
+      touch-action: none;           /* enable smooth pointer events on touch */
+    }
+    .time-block:hover .time-resize-handle,
+    .time-block:has(:focus-visible) .time-resize-handle {
+      opacity: 1; pointer-events: auto;
+    }
+    .time-resize-handle.br { right: -0.5vw; cursor: nwse-resize; }
+    .time-resize-handle.bl { left:  -0.5vw; cursor: nesw-resize; }
+    .time-resize-handle.bc { left:  calc(50% -0.5vw); cursor: ns-resize; width: 8vw;}
+
+    .time-resize-handle.br.brv { right: -0.5vw; cursor: nwse-resize; height: 5vw; width: 1vw;}
+    .time-resize-handle.bl.brv { left:  -0.5vw; cursor: nesw-resize; height: 5vw; width: 1vw;}
+
+    .time-resize-handle.bl.btop, .time-resize-handle.br.btop {cursor: auto;}
+
+    .time-resize-handle.btop {bottom: auto; top: -0.5vw;  cursor: auto; background: rgba(200,200,200);
+      border: 1px solid rgba(200,200,200);}
+
+    /* While dragging, prevent accidental text selection */
+    body.time-resizing, body.time-resizing * {
+      user-select: none !important;
+      -webkit-user-select: none !important;
+    }
+  </style>
+</head>
+<body>
+<main id="board" aria-live="polite">
+  <!-- === Time block (always first) === -->
+  <section id="timeBlock" class="block time-block" data-mode="clock" aria-label="Time">
+    <div class="badge" id="editBadge">Editing time – use ↑/↓ to adjust, ←/→ to move, Enter to finish</div>
+
+    <div class="time-wrap">
+      <div class="time" id="timeDisplay" role="group" aria-label="Current time">
+        <div class="main">
+          <span class="seg hh" id="hh" tabindex="0" aria-label="Hours" aria-selected="false">12</span>
+          <span class="colon">:</span>
+          <span class="seg mm" id="mm" tabindex="0" aria-label="Minutes" aria-selected="false">00</span>
+        </div>
+        <div class="side">
+          <span class="ampm seg" id="ampm" tabindex="0" aria-label="AM or PM" aria-selected="false">AM</span>
+          <span class="sec seg" tabindex="0" aria-label="Seconds" aria-selected="false">:<span id="ss" >00</span></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="time-resize-handle bl" id="timeHandleBL" title="Drag to scale time"></div>
+    <div class="time-resize-handle br" id="timeHandleBR" title="Drag to scale time"></div>
+    <div class="time-resize-handle bl brv" id="timeHandleBL2" title="Drag to scale time"></div>
+    <div class="time-resize-handle br brv" id="timeHandleBR2" title="Drag to scale time"></div>
+    <div class="time-resize-handle bc" id="timeHandleBC" title="Drag to scale time"></div>
+    <div class="time-resize-handle bl btop" id="timeHandleBLT"></div>
+    <div class="time-resize-handle br btop" id="timeHandleBRT"></div>
+    <div class="time-resize-handle bl btop brv" id="timeHandleBLT2"></div>
+    <div class="time-resize-handle br btop brv" id="timeHandleBRT2"></div>
+    <div class="time-resize-handle bc btop" id="timeHandleBCT"></div>
+
+
+    <div class="controls" id="timeControls" style="display: none;">
+
+      <div class="group">
+        <label class="toggle">
+          <input type="checkbox" id="modeToggle" />
+          Countdown
+        </label>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- === Notes container === -->
+  <section id="notes"></section>
+</main>
+
+<!-- Activity HUD -->
+<div id="hud" title="Click to add a new note (or start typing)">
+
+  <p>Click <span style="text-decoration: underline;">here</span> to create a new note or start typing</p>
+
+</div>
+
+<script>
+  (function() {
+    "use strict";
+
+    /* =========================
+       State & constants
+       ========================= */
+    const DEFAULT_NOTE_TEXT = "Look at the board for new announcements";
+    const MAX_SIZE = 25;
+    const MIN_SIZE = 8;
+
+    const MAX_SIZE_NOTE = 9;
+    const MIN_SIZE_NOTE = 2;
+    const NUM_STEPS = 20;
+    const INITIAL_STEPS = 4;
+
+    // Time state
+    const timeState = {
+      mode: "clock",          // "clock" | "countdown"
+      offsetMs: 0,            // user adjustment offset vs system
+      editing: false,         // editing segments with arrows
+      editTarget: null,       // "hh" | "mm" | "ampm" | "ss"
+      countdown: {
+        byEndTime: true,
+        endTimestamp: null,
+        durationMs: 0,
+        startedAt: null
+      }
+    };
+
+    // Elements
+    const board = document.getElementById("board");
+    const timeBlock = document.getElementById("timeBlock");
+    const timeWrap = document.getElementById("timeWrap");
+    const timeDisplay = document.getElementById("timeDisplay");
+    const hhEl = document.getElementById("hh");
+    const mmEl = document.getElementById("mm");
+    const ssEl = document.getElementById("ss");
+    const ampmEl = document.getElementById("ampm");
+    const modeToggle = document.getElementById("modeToggle");
+    const cdEnd = document.getElementById("cdEnd");
+    const cdDur = document.getElementById("cdDur");
+    const notes = document.getElementById("notes");
+    const hud = document.getElementById("hud");
+
+    // NEW: resize handles
+    const timeHandleBL = document.getElementById("timeHandleBL");
+    const timeHandleBR = document.getElementById("timeHandleBR");
+    const timeHandleBL2 = document.getElementById("timeHandleBL2");
+    const timeHandleBR2 = document.getElementById("timeHandleBR2");
+    const timeHandleBC = document.getElementById("timeHandleBC");
+
+    // Keep a tick interval (250ms keeps seconds snappy and reduces drift)
+    let tickHandle = null;
+
+    // NEW: dragging state
+    let timeResizing = false;
+    const MIN_FONT_PX = 10; // floor to avoid vanishingly small text
+    const initialTimeBaseStr = getComputedStyle(document.documentElement)
+            .getPropertyValue("--time-base").trim() || "16vw";
+
+    /* =========================
+       Utilities
+       ========================= */
+    function pad2(n) { return String(n).padStart(2,"0"); }
+    function nowMs() { return Date.now() + timeState.offsetMs; }
+
+    function isPrintableKey(e) {
+      if (e.ctrlKey || e.metaKey || e.altKey) return false;
+      if (e.key.length === 1) return true;
+      return false;
+    }
+
+    function placeCaretAtEnd(el) {
+      el.focus({preventScroll:true});
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(false);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+
+    function parseDuration(input) {
+      if (!input) return null;
+      const s = input.trim();
+      if (!s) return null;
+      if (/^\d+$/.test(s)) {
+        const minutes = parseInt(s,10);
+        return minutes * 60 * 1000;
+      }
+      const parts = s.split(":").map(x => x.trim());
+      if (parts.some(p => p === "" || isNaN(p))) return null;
+      let h=0,m=0,_s=0;
+      if (parts.length === 2) { h = parseInt(parts[0],10); m = parseInt(parts[1],10); }
+      else if (parts.length === 3) { h = parseInt(parts[0],10); m = parseInt(parts[1],10); _s = parseInt(parts[2],10); }
+      else return null;
+      if (m>59 || _s>59) return null;
+      return ((h*60 + m)*60 + _s) * 1000;
+    }
+
+    function setAttrSelected(el, on) {
+      el.setAttribute("aria-selected", on ? "true" : "false");
+    }
+
+    // NEW: helpers for CSS var parsing
+    function readRootVar(name) {
+      return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    }
+    function parseNumberUnit(str) {
+      const m = String(str).trim().match(/^(-?\d*\.?\d+)([a-z%]*)$/i);
+      return { num: m ? parseFloat(m[1]) : 0, unit: m ? m[2] || "" : "" };
+    }
+
+    /* =========================
+       Time rendering & logic
+       ========================= */
+    function renderClock(ts) {
+      const d = new Date(ts);
+      let h = d.getHours();
+      const m = d.getMinutes();
+      const s = d.getSeconds();
+      const mer = (h >= 12) ? "PM" : "AM";
+      h = h % 12; if (h === 0) h = 12;
+      hhEl.textContent = pad2(h);
+      mmEl.textContent = pad2(m);
+      ssEl.textContent = pad2(s);
+      ampmEl.textContent = mer;
+    }
+
+    function renderCountdown() {
+      let remaining = 0;
+      if (timeState.countdown.byEndTime && timeState.countdown.endTimestamp) {
+        remaining = timeState.countdown.endTimestamp - nowMs();
+      } else if (!timeState.countdown.byEndTime && timeState.countdown.durationMs) {
+        remaining = (timeState.countdown.startedAt ?? nowMs()) + timeState.countdown.durationMs - nowMs();
+      }
+      if (remaining < 0) remaining = 0;
+      const totalSec = Math.floor(remaining / 1000);
+      const h = Math.floor(totalSec / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      const s = totalSec % 60;
+
+      hhEl.textContent = pad2(h);
+      mmEl.textContent = pad2(m % 60);
+      ssEl.textContent = pad2(s);
+      ampmEl.textContent = " "; // keep slot so layout is stable; label "LEFT" added via CSS
+    }
+
+    function tick() {
+      if (timeState.mode === "clock") {
+        renderClock(nowMs());
+      } else {
+        renderCountdown();
+      }
+    }
+
+    function startTicking() {
+      if (tickHandle) clearInterval(tickHandle);
+      tickHandle = setInterval(tick, 250);
+      tick(); // immediate
+    }
+
+    /* =========================
+       Time controls (editing & modes)
+       ========================= */
+    function setTimeEditing(on) {
+      timeState.editing = on;
+      timeBlock.toggleAttribute("data-editing", on);
+      if (on && !timeState.editTarget) {
+        timeState.editTarget = "hh";
+        setAttrSelected(hhEl, true);
+      }
+      if (!on) {
+        setAttrSelected(hhEl, false);
+        setAttrSelected(mmEl, false);
+        setAttrSelected(ssEl, false);
+        setAttrSelected(ampmEl, false);
+        timeState.editTarget = null;
+      }
+    }
+
+    function rotateTarget(dir) {
+      const order = ["hh","mm","ampm","ss"];
+      let idx = order.indexOf(timeState.editTarget || "hh");
+      idx = (idx + (dir > 0 ? 1 : -1) + order.length) % order.length;
+      timeState.editTarget = order[idx];
+      setAttrSelected(hhEl, order[idx]==="hh");
+      setAttrSelected(mmEl, order[idx]==="mm");
+      setAttrSelected(ampmEl, order[idx]==="ampm");
+      setAttrSelected(ssEl, order[idx]==="ss");
+    }
+
+    function adjustSegment(delta) {
+      const base = new Date(nowMs());
+      if (timeState.mode === "countdown") {
+        let remain = 0;
+        if (timeState.countdown.byEndTime && timeState.countdown.endTimestamp) {
+          remain = timeState.countdown.endTimestamp - nowMs();
+        } else {
+          remain = (timeState.countdown.durationMs || 0);
+        }
+        if (timeState.editTarget === "hh") remain += delta * 3600_000;
+        if (timeState.editTarget === "mm") remain += delta * 60_000;
+        if (timeState.editTarget === "ss") remain += delta * 1000;
+        remain = Math.max(0, remain);
+        if (timeState.countdown.byEndTime) {
+          timeState.countdown.endTimestamp = nowMs() + remain;
+          timeState.countdown.startedAt = null;
+        } else {
+          timeState.countdown.durationMs = remain;
+          timeState.countdown.startedAt = nowMs();
+        }
+        return;
+      }
+
+      const desired = new Date(base);
+      if (timeState.editTarget === "hh") desired.setHours(desired.getHours() + delta);
+      if (timeState.editTarget === "mm") desired.setMinutes(desired.getMinutes() + delta);
+      if (timeState.editTarget === "ss") desired.setSeconds(desired.getSeconds() + delta);
+      if (timeState.editTarget === "ampm") desired.setHours(desired.getHours() + (delta>0 ? 12 : -12));
+      const systemNow = Date.now();
+      timeState.offsetMs = desired.getTime() - systemNow;
+    }
+
+    function setCountdownFromInputs() {
+      const byEnd = document.querySelector('input[name="cdmode"]:checked')?.value === "end";
+      timeState.countdown.byEndTime = byEnd;
+
+      if (byEnd) {
+        const v = cdEnd.value; // "HH:MM" 24h
+        if (!v) return;
+        const [H,M] = v.split(":").map(x=>parseInt(x,10));
+        const target = new Date(nowMs());
+        target.setHours(H, M, 0, 0);
+        if (target.getTime() <= nowMs()) target.setDate(target.getDate() + 1);
+        timeState.countdown.endTimestamp = target.getTime();
+        timeState.countdown.startedAt = null;
+      } else {
+        const durMs = parseDuration(cdDur.value);
+        if (!durMs) return;
+        timeState.countdown.durationMs = durMs;
+        timeState.countdown.startedAt = nowMs();
+      }
+    }
+
+    function toggleMode(countdownOn) {
+      timeState.mode = countdownOn ? "countdown" : "clock";
+      timeBlock.dataset.mode = timeState.mode;
+      // cdInputs.hidden = !countdownOn;
+      tick();
+    }
+
+    /* =========================
+       Note block creation / behavior (unchanged)
+       ========================= */
+    function createNote(initialText = DEFAULT_NOTE_TEXT, isDefault = true) {
+      const article = document.createElement("article");
+      article.className = "block note";
+      let current_steps = INITIAL_STEPS;
+      let current_size = MIN_SIZE_NOTE+(MAX_SIZE_NOTE-MIN_SIZE_NOTE)/NUM_STEPS*current_steps;
+      article.style.setProperty("--note-base", current_size+"vw");
+
+      if (isDefault) article.setAttribute("data-default", "true");
+
+      const content = document.createElement("div");
+      content.className = "content";
+      content.contentEditable = "true";
+      content.spellcheck = false;
+      content.textContent = "";
+
+      const controls = document.createElement("div");
+      controls.className = "controls";
+      controls.innerHTML = `
+<div class="plus-minus-btns"><button class="btn inc-size size-btn" title="Increase the size of this note">+</button>
+        <button class="btn dec-size size-btn" title="Decrease the size of this note">-</button></div>
+        <button class="btn danger delBtn" title="Delete this note">Delete</button>
+
+`;
+
+      article.appendChild(content);
+      article.appendChild(controls);
+      notes.appendChild(article);
+
+      content.addEventListener("input", () => {
+        if (article.hasAttribute("data-default")) {
+          article.removeAttribute("data-default");
+        }
+      });
+
+      content.addEventListener("keydown", (e) => {
+        if (e.key.toLowerCase().startsWith("arrow") && article.hasAttribute("data-default")) {
+          article.removeAttribute("data-default");
+        }
+      });
+
+      content.addEventListener("focus", () => {
+        if (article.dataset.default === "true") {
+          setTimeout(() => document.execCommand("selectAll", false, null), 0);
+        }
+      });
+
+      content.addEventListener("blur", () => {
+        if (content.textContent.trim() === "") {
+          article.setAttribute("data-default","true");
+          content.textContent = DEFAULT_NOTE_TEXT;
+        }
+      });
+
+      controls.querySelector(".delBtn").addEventListener("click", () => {
+        article.remove();
+        showHud();
+      });
+
+      controls.querySelector(".dec-size").addEventListener("click", () => {
+        if (current_steps > 0) {
+          current_steps--;
+          current_size = MIN_SIZE_NOTE+(MAX_SIZE_NOTE-MIN_SIZE_NOTE)/NUM_STEPS*current_steps;
+          article.style.setProperty("--note-base", current_size+"vw");
+        }
+        showHud();
+      });
+
+      controls.querySelector(".inc-size").addEventListener("click", () => {
+        if (current_steps < NUM_STEPS) {
+          current_steps++;
+          current_size = MIN_SIZE_NOTE+(MAX_SIZE_NOTE-MIN_SIZE_NOTE)/NUM_STEPS*current_steps;
+          article.style.setProperty("--note-base", current_size+"vw");
+        }
+        showHud();
+      });
+
+      setTimeout(() => {
+        content.textContent = initialText;
+        content.focus();
+        placeCaretAtEnd(content);
+      }, 0);
+
+  if (!isDefault) article.removeAttribute("data-default");
+
+      return {article, content};
+    }
+
+    /* =========================
+       Activity HUD & typing-to-add (unchanged)
+       ========================= */
+    let hudTimer = null;
+    function showHud() {
+      hud.classList.add("visible");
+      if (hudTimer) clearTimeout(hudTimer);
+      hudTimer = setTimeout(() => hud.classList.remove("visible"), 2500);
+    }
+    ["mousemove","keydown","pointerdown"].forEach(ev => {
+      document.addEventListener(ev, () => showHud(), {passive:true});
+    });
+    hud.querySelector("p").addEventListener("click", () => {
+      const { content } = createNote();
+      content.focus();
+    });
+
+    document.addEventListener("keydown", (e) => {
+      const ae = document.activeElement;
+      const isField = ae && (ae.isContentEditable || /^(input|textarea|select|button)$/i.test(ae.tagName));
+      if (!isField && isPrintableKey(e)) {
+        e.preventDefault();
+        createNote(e.key, false);
+      }
+    });
+
+    /* =========================
+       Wire time controls & keyboard (size slider removed)
+       ========================= */
+
+
+    // [hhEl, mmEl, ssEl, ampmEl].forEach(seg => {
+    //   seg.addEventListener("click", () => {
+    //     setTimeEditing(true);
+    //     const id = seg.id;
+    //     timeState.editTarget = id;
+    //     setAttrSelected(hhEl, id === "hh");
+    //     setAttrSelected(mmEl, id === "mm");
+    //     setAttrSelected(ssEl, id === "ss");
+    //     setAttrSelected(ampmEl, id === "ampm");
+    //   });
+    // });
+
+    document.addEventListener("keydown", (e) => {
+      if (!timeState.editing) return;
+      if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Enter","Escape"].includes(e.key)) {
+        e.preventDefault();
+        if (e.key === "ArrowLeft") rotateTarget(-1);
+        else if (e.key === "ArrowRight") rotateTarget(+1);
+        else if (e.key === "ArrowUp") adjustSegment(+1);
+        else if (e.key === "ArrowDown") adjustSegment(-1);
+        else if (e.key === "Enter") setTimeEditing(false);
+        else if (e.key === "Escape") { setTimeEditing(false); }
+        tick();
+      }
+    });
+
+    modeToggle.addEventListener("change", (e) => {
+      const on = e.target.checked;
+      toggleMode(on);
+    });
+
+    [hhEl, mmEl, ssEl, ampmEl].forEach(seg => {
+      seg.addEventListener("keydown", (e) => {
+        if (e.key === " ") e.preventDefault();
+      });
+    });
+
+    /* =========================
+       NEW: Drag-to-scale time (bottom-corner handles)
+       ========================= */
+    const timeDrag = { active:false, startY:0, H0:0, baseNum:0, baseUnit:"", font0:0 };
+
+    function beginTimeResize(ev) {
+      ev.preventDefault();
+      timeResizing = true;
+      timeDrag.active = true;
+      timeDrag.startY = ev.clientY;
+
+      const rect = timeDisplay.getBoundingClientRect();
+      timeDrag.H0 = rect.height;
+
+      const baseStr = readRootVar("--time-base") || initialTimeBaseStr;
+      const { num, unit } = parseNumberUnit(baseStr);
+      timeDrag.baseNum = num;
+      timeDrag.baseUnit = unit;
+
+      timeDrag.font0 = parseFloat(getComputedStyle(timeDisplay).fontSize) || 1;
+
+      document.body.classList.add("time-resizing");
+      ev.currentTarget.setPointerCapture?.(ev.pointerId);
+    }
+
+    function onTimeResizeMove(ev) {
+      if (!timeDrag.active || !ev.buttons) return;
+      const dy = ev.clientY - timeDrag.startY;
+      let targetH = Math.max(6, timeDrag.H0 + dy); // avoid collapse
+      let k = targetH / Math.max(1, timeDrag.H0);  // proportional change
+      // clamp to minimum font px
+      const newFont = timeDrag.font0 * k;
+      if (newFont < MIN_FONT_PX) {
+        k = MIN_FONT_PX / timeDrag.font0;
+        targetH = timeDrag.H0 * k;
+      }
+      const newBase = Math.max(Math.min((timeDrag.baseNum * k).toFixed(4), MAX_SIZE), MIN_SIZE) + timeDrag.baseUnit;
+      document.documentElement.style.setProperty("--time-base",newBase);
+    }
+
+    function endTimeResize(ev) {
+      if (!timeDrag.active) return;
+      timeDrag.active = false;
+      timeResizing = false;
+      document.body.classList.remove("time-resizing");
+      try { ev.currentTarget.releasePointerCapture?.(ev.pointerId); } catch {}
+      // Re-apply layout helpers after size change
+    }
+
+    function resetTimeSize() {
+      document.documentElement.style.setProperty("--time-base", initialTimeBaseStr);
+    }
+
+    [timeHandleBL, timeHandleBR, timeHandleBC, timeHandleBL2, timeHandleBR2].forEach(h => {
+      h.addEventListener("pointerdown", beginTimeResize);
+      h.addEventListener("pointermove", onTimeResizeMove);
+      h.addEventListener("pointerup", endTimeResize);
+      h.addEventListener("pointercancel", endTimeResize);
+      h.addEventListener("dblclick", resetTimeSize);
+    });
+
+    /* =========================
+       Boot
+       ========================= */
+    startTicking();
+    showHud();
+    createNote();
+  })();
+</script>
+</body>
+</html>
