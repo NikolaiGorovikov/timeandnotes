@@ -868,6 +868,7 @@
         ball.active = true;
         ball.startLeft = (controls.querySelector(".range-ball").getBoundingClientRect().x-controls.querySelector(".plus-minus-btns").getBoundingClientRect().x);
         ball.start = e.clientX;
+        content.blur();
         e.stopImmediatePropagation();
         e.preventDefault();
       });
