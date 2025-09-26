@@ -50,12 +50,11 @@
     }
 
     #board {
-      height: 100dvh; /* use dynamic viewport units for mobile bars */
       padding: var(--board-pad);
       display: flex;
       flex-direction: column;
       gap: var(--block-gap);
-      overflow-x: hidden;
+      /*overflow-x: hidden;*/
     }
 
     #notes {
@@ -91,7 +90,56 @@
       pointer-events: none;
       transition: opacity 150ms ease;
       backdrop-filter: blur(5px);
+      font-family: Inter;!important;
+      font-size: 12px;
+      user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      -webkit-user-select: none;
+      cursor: pointer;
     }
+
+    #timeControls *{
+      cursor: pointer;
+    }
+
+    #timeControls{
+      height: 24px;
+      padding: 5px;
+      line-height: 1;
+      vertical-align: center;
+      text-align: center;
+      right: calc(0.7vw + 2px);
+      top: calc(0.7vw + 2px);
+    }
+
+    #modeToggle{
+      padding: 0 0 0 0;
+      margin: 0 0 0 0;
+      height: 12px;
+      width: 12px;
+      display: inline-block;
+      accent-color: #000;
+    }
+
+    .countdown-text {
+      height: 12px;
+      display: inline-block;
+      margin: 0 0 0 0;
+      padding: 0 0 0 0;
+      line-height: 1.2;
+    }
+
+    .time-controls, .time-controls .toggle{
+      height: 12px;
+    }
+
+    .time-controls .toggle {
+      display: flex;
+      flex-direction: row;
+      gap: 3px;
+    }
+
 
     .note .controls{
       padding: 0 0 0 0;
@@ -108,7 +156,7 @@
       font-family: 'Roboto Slab'; !important;
     }
 
-    .block:hover .controls,
+    .block:not(.grabbing .block):hover .controls,
     .block[data-editing="true"] .controls,
     .being-resized .controls {
       opacity: 1; pointer-events: auto;
@@ -242,10 +290,9 @@
     }
     .time-block[data-editing="true"] .badge { opacity: 1; }
 
-    button{
+    .note button{
       font-family: Inter;!important;
       font-size: 12px;
-      height: 20px;
       line-height: 1;
     }
 
@@ -391,8 +438,8 @@
 
     .time-hitbox.hit-b{
       width: 100%;
-      height: 16%;
-      bottom: -4%;
+      height: 15%;
+      bottom: -3%;
       left: 0;
       z-index: 2;
       cursor: ns-resize;
@@ -414,7 +461,7 @@
       cursor: nwse-resize;
     }
 
-    .time-block:hover .time-resize-handle,
+    .time-block:not(.grabbing .time-block):hover .time-resize-handle,
     .time-block:has(:focus-visible) .time-resize-handle {
       opacity: 1; pointer-events: auto;
     }
@@ -431,10 +478,189 @@
       border: 1px solid rgba(200,200,200);}
 
     /* While dragging, prevent accidental text selection */
-    body.time-resizing, body.time-resizing * {
+    body.time-resizing, body.time-resizing *{
       user-select: none !important;
       -webkit-user-select: none !important;
     }
+
+    @media (min-width: 700px) {
+      .btn {
+        border: 1.33px solid rgba(0,0,0,0.15);
+        padding: 6.66px;
+        border-radius: 10.66px;
+        font-size: 16px;
+        height: 16px;
+      }
+
+      .note button{
+        font-size: 16px;
+      }
+
+      .size-btn {
+        font-size: 16px;
+        height: 16px;
+        width: 16px;
+        padding: 6.66px; !important;
+      }
+
+      .plus-minus-btns{
+        height: 16px;
+        width: 133.33px;
+        margin-top: 6.66px;
+        margin-left: 6.66px;
+      }
+
+      .note-size-cover{
+        height: 32px;
+        width: 149.33px;
+        border-radius: 10.66px;
+        border: 1.33px solid rgba(0, 0, 0, 0.15);
+      }
+
+      .range-line {
+        height: 5.33px;
+        width: 122.66px;
+        border-radius: 200px;
+        left: 5.66px;
+        top: 5.66px;
+      }
+
+      .range-line-progress {
+        height: 5.66px;
+      }
+
+      .range-ball{
+        height: 16px;
+        width: 16px;
+        border-radius: 200px;
+      }
+
+      .note {
+        min-height: 46px;
+      }
+
+      .controls{
+        font-size: 16px;
+        border: 1.33px solid rgba(0,0,0,0.08);
+        backdrop-filter: blur(6.66px);
+      }
+      #timeControls{
+        height: 32px;
+        padding: 6.66px;
+        right: calc(0.7vw + 1.33px);
+        top: calc(0.7vw + 1.33px);
+      }
+
+      #modeToggle{
+        height: 16px;
+        width: 16px;
+      }
+
+      .countdown-text {
+        height: 16px;
+        line-height: 1.15;
+      }
+
+      .time-controls, .time-controls .toggle{
+        height: 16px;
+      }
+
+      .time-controls .toggle {
+        gap: 4px;
+      }
+    }
+
+    @media (min-width: 1100px) {
+      .btn {
+        border: 2px solid rgba(0,0,0,0.15);
+        padding: 10px;
+        border-radius: 16px;
+        font-size: 24px;
+        height: 24px;
+      }
+
+      .note button{
+        font-size: 24px;
+      }
+
+      .size-btn {
+        font-size: 24px;
+        height: 24px;
+        width: 24px;
+        padding: 10px; !important;
+      }
+
+      .plus-minus-btns{
+        height: 24px;
+        width: 200px;
+        margin-top: 10px;
+        margin-left: 10px;
+      }
+
+      .note-size-cover{
+        height: 48px;
+        width: 224px;
+        border-radius: 16px;
+        border: 2px solid rgba(0, 0, 0, 0.15);
+      }
+
+      .range-line {
+        height: 8px;
+        width: 184px;
+        border-radius: 400px;
+        left: 8px;
+        top: 8px;
+      }
+
+      .range-line-progress {
+        height: 8px;
+      }
+
+      .range-ball{
+        height: 24px;
+        width: 24px;
+        border-radius: 400px;
+      }
+
+      .note {
+        min-height: 46px;
+      }
+
+      .controls{
+        font-size: 24px;
+        border: 2px solid rgba(0,0,0,0.08);
+        backdrop-filter: blur(10px);
+      }
+      #timeControls{
+        height: 48px;
+        padding: 10px;
+        right: calc(0.7vw + 2px);
+        top: calc(0.7vw + 2px);
+      }
+
+      #modeToggle{
+        height: 24px;
+        width: 24px;
+      }
+
+      .countdown-text {
+        height: 24px;
+        line-height: 1.1;
+      }
+
+      .time-controls, .time-controls .toggle{
+        height: 24px;
+      }
+
+      .time-controls .toggle {
+        gap: 6px;
+      }
+    }
+
+    .grabbing *, .grabbing{
+      cursor: grabbing; !important;
+    }
+
   </style>
 </head>
 <body>
@@ -473,12 +699,12 @@
     <div class="time-hitbox hit-r"></div>
 
 
-    <div class="controls" id="timeControls" style="display: none;">
+    <div class="controls" id="timeControls">
 
-      <div class="group">
+      <div class="group time-controls">
         <label class="toggle">
           <input type="checkbox" id="modeToggle" />
-          Countdown
+          <span class="countdown-text">Countdown</span>
         </label>
       </div>
 
@@ -852,6 +1078,7 @@
         if (ball.active) {
           ball.active = false;
           controls.closest(".note").classList.remove("being-resized");
+          document.body.classList.remove("grabbing");
         }
       }
 
@@ -865,6 +1092,7 @@
       controls.querySelector(".range-ball").addEventListener("pointerdown", (e) => {
         if (ball.active) return;
         controls.closest(".note").classList.add("being-resized");
+        document.body.classList.add("grabbing");
         ball.active = true;
         ball.startLeft = (controls.querySelector(".range-ball").getBoundingClientRect().x-controls.querySelector(".plus-minus-btns").getBoundingClientRect().x);
         ball.start = e.clientX;
@@ -882,19 +1110,9 @@
         e.preventDefault();
       });
 
-      // function blur(e) {
-      //   if (!e.target.closest(".notes") && document.activeElement === content) {
-      //     console.log(123);
-      //     // content.blur();
-      //   }
-      // }
-
       document.body.addEventListener("pointermove", pm);
-
       document.body.addEventListener("pointerup", pu);
-
       document.body.addEventListener("pointercancel", pu);
-      // document.body.addEventListener("click", blur)
 
       controls.querySelector(".delBtn").addEventListener("click", () => {
         storage.notes.list.splice(storage.notes.list.indexOf(storage.notes.list.find(i => i.article === article)), 1);
@@ -902,8 +1120,7 @@
         showHud();
         document.body.removeEventListener("pointermove", pm);
         document.body.removeEventListener("pointerup", pu);
-        document.body.removeEventListener("pointercancel", pc);
-        document.body.removeEventListener("click", blur);
+        document.body.removeEventListener("pointercancel", pu);
       });
 
       setTimeout(() => {
@@ -1078,7 +1295,7 @@
 
 //     Clicking on empty space inside #notes should not refocus the last note.
 // Run in capture phase so it happens before the browser tries to place a caret.
-    notes.addEventListener("pointerdown", (e) => {
+    document.body.addEventListener("pointerdown", (e) => {
       // If the click isn't inside a note's editable content, clear focus & selection.
       if (!e.target.closest(".focusable")) {
         const ae = document.activeElement;
