@@ -6,7 +6,7 @@
   <title>Exam Time & Announcements Board</title>
   <style>
     /* ===== Base / Layout ===== */
-    * { box-sizing: border-box; }
+    * { box-sizing: border-box; touch-action: none; -ms-touch-action: none;}
     html, body { height: 100%; }
     body {
       margin: 0;
@@ -55,6 +55,7 @@
       display: flex;
       flex-direction: column;
       gap: var(--block-gap);
+      overflow-x: hidden;
     }
 
     #notes {
@@ -72,6 +73,8 @@
       /* Lightweight subtle elevation without stealing attention */
       box-shadow: 0 0 0 1px rgba(0,0,0,0.03), 0 1px 2px rgba(0,0,0,0.04);
       background: #fff;
+      min-height: 38px;
+      display: flex;
     }
 
     /* ===== Controls on hover ===== */
@@ -87,7 +90,7 @@
       opacity: 0;
       pointer-events: none;
       transition: opacity 150ms ease;
-      backdrop-filter: blur(2px);
+      backdrop-filter: blur(5px);
     }
 
     .note .controls{
@@ -198,6 +201,7 @@
     .note .content {
       outline: none;
       word-break: break-word;
+      margin: auto 0;
     }
     .note[data-default="true"] .content {
       color: #8c8c8c;
@@ -257,7 +261,54 @@
     .plus-minus-btns{
       display: flex;
       flex-direction: row;
-      gap: 5px;
+      height: 12px;
+      width: 100px;
+      position: relative;
+      margin-top: 5px;
+      margin-left: 5px;
+    }
+
+    .note-size-cover{
+      height: 24px;
+      width: 112px;
+      display: flex;
+      flex-direction: row;
+      border-radius: 8px;
+      border: 1px solid rgba(0, 0, 0, 0.15);
+    }
+
+    .range-line {
+      position: absolute;
+      height: 4px;
+      width: 92px;
+      background-color: rgba(230,230,230);
+      border-radius: 100px;
+      left: 4px;
+      top: 4px;
+      overflow: hidden;
+    }
+
+    .range-line-progress {
+      position: absolute;
+      top:0;
+      bottom: 0;
+      height: 4px;
+      background-color: rgba(160,160,160);
+    }
+
+    .range-ball{
+      position: absolute;
+      height: 12px;
+      width: 12px;
+      border-radius: 100px;
+      background-color: #000;
+      left: 0;
+      top: 0;
+      cursor: grab;
+    }
+
+    .time-resize-handle:not(.time-resize-handle.btop):active, .range-ball:active {
+      cursor: grabbing;
     }
 
     .btn:active {
@@ -324,8 +375,44 @@
       opacity: 0;
       pointer-events: none;
       transition: opacity 120ms ease;
-      touch-action: none;           /* enable smooth pointer events on touch */
+      touch-action: none;
+      z-index: 3;/* enable smooth pointer events on touch */
     }
+
+    .time-hitbox{
+      position: absolute;
+      z-index: 1;
+    }
+
+    .time-hitbox:active{
+      cursor: grabbing;
+    }
+
+    .time-hitbox.hit-b{
+      width: 100%;
+      height: 16%;
+      bottom: -4%;
+      left: 0;
+      z-index: 2;
+      cursor: ns-resize;
+    }
+
+    .time-hitbox.hit-l{
+      width: 3.5%;
+      height: 50%;
+      bottom: 0;
+      left: -1%;
+      cursor: nesw-resize;
+    }
+
+    .time-hitbox.hit-r{
+      width: 3.5%;
+      height: 50%;
+      bottom: 0;
+      right: -1%;
+      cursor: nwse-resize;
+    }
+
     .time-block:hover .time-resize-handle,
     .time-block:has(:focus-visible) .time-resize-handle {
       opacity: 1; pointer-events: auto;
@@ -337,9 +424,9 @@
     .time-resize-handle.br.brv { right: -0.5vw; cursor: nwse-resize; height: 5vw; width: 1vw;}
     .time-resize-handle.bl.brv { left:  -0.5vw; cursor: nesw-resize; height: 5vw; width: 1vw;}
 
-    .time-resize-handle.bl.btop, .time-resize-handle.br.btop {cursor: auto;}
+    .time-resize-handle.bl.btop, .time-resize-handle.br.btop {cursor: not-allowed;}
 
-    .time-resize-handle.btop {bottom: auto; top: -0.5vw;  cursor: auto; background: rgba(200,200,200);
+    .time-resize-handle.btop {bottom: auto; top: -0.5vw;  cursor: not-allowed; background: rgba(200,200,200);
       border: 1px solid rgba(200,200,200);}
 
     /* While dragging, prevent accidental text selection */
@@ -380,6 +467,10 @@
     <div class="time-resize-handle br btop brv" id="timeHandleBRT2"></div>
     <div class="time-resize-handle bc btop" id="timeHandleBCT"></div>
 
+    <div class="time-hitbox hit-b"></div>
+    <div class="time-hitbox hit-l"></div>
+    <div class="time-hitbox hit-r"></div>
+
 
     <div class="controls" id="timeControls" style="display: none;">
 
@@ -416,9 +507,18 @@
     const MIN_SIZE = 8;
 
     const MAX_SIZE_NOTE = 9;
-    const MIN_SIZE_NOTE = 2;
+    const MIN_SIZE_NOTE = 3;
     const NUM_STEPS = 20;
-    const INITIAL_STEPS = 4;
+    const INITIAL_STEPS = 0.2;
+
+    const storage = {
+      time: {
+        size: undefined
+      },
+      notes: {
+        list: []
+      }
+    }
 
     // Time state
     const timeState = {
@@ -660,12 +760,17 @@
     /* =========================
        Note block creation / behavior (unchanged)
        ========================= */
-    function createNote(initialText = DEFAULT_NOTE_TEXT, isDefault = true) {
+    function createNote(initialText = DEFAULT_NOTE_TEXT, isDefault = true, initial_progress = INITIAL_STEPS) {
       const article = document.createElement("article");
       article.className = "block note";
-      let current_steps = INITIAL_STEPS;
-      let current_size = MIN_SIZE_NOTE+(MAX_SIZE_NOTE-MIN_SIZE_NOTE)/NUM_STEPS*current_steps;
+      let current_size = MIN_SIZE_NOTE+(MAX_SIZE_NOTE-MIN_SIZE_NOTE)*initial_progress;
       article.style.setProperty("--note-base", current_size+"vw");
+
+      storage.notes.list.push({
+        article,
+        text: "",
+        size: current_size
+      });
 
       if (isDefault) article.setAttribute("data-default", "true");
 
@@ -678,8 +783,18 @@
       const controls = document.createElement("div");
       controls.className = "controls";
       controls.innerHTML = `
-<div class="plus-minus-btns"><button class="btn inc-size size-btn" title="Increase the size of this note">+</button>
-        <button class="btn dec-size size-btn" title="Decrease the size of this note">-</button></div>
+<div class="note-size-cover">
+
+<div class="plus-minus-btns" title="Grad to change the font size">
+
+<div class="range-line">
+    <div class="range-line-progress"></div>
+</div>
+<div class="range-ball"></div>
+
+</div>
+
+</div>
         <button class="btn danger delBtn" title="Delete this note">Delete</button>
 
 `;
@@ -688,10 +803,16 @@
       article.appendChild(controls);
       notes.appendChild(article);
 
+      let current_left = (controls.querySelector(".range-line").getBoundingClientRect().width-controls.querySelector(".range-ball").getBoundingClientRect().width/2+controls.querySelector(".range-line").getBoundingClientRect().height/2)*initial_progress;
+      controls.querySelector(".range-line-progress").style.width = current_left/(controls.querySelector(".range-line").getBoundingClientRect().width-controls.querySelector(".range-ball").getBoundingClientRect().width/2+controls.querySelector(".range-line").getBoundingClientRect().height/2) * controls.querySelector(".range-line").getBoundingClientRect().width+"px";
+      article.style.setProperty("--note-base", current_left/(controls.querySelector(".range-line").getBoundingClientRect().width-controls.querySelector(".range-ball").getBoundingClientRect().width/2+controls.querySelector(".range-line").getBoundingClientRect().height/2)*(MAX_SIZE_NOTE-MIN_SIZE_NOTE)+MIN_SIZE_NOTE+"vw");
+      controls.querySelector(".range-ball").style.left = current_left+"px";
+
       content.addEventListener("input", () => {
         if (article.hasAttribute("data-default")) {
           article.removeAttribute("data-default");
         }
+        storage.notes.list.find(i => i.article === article).text = content.textContent
       });
 
       content.addEventListener("keydown", (e) => {
@@ -711,29 +832,59 @@
           article.setAttribute("data-default","true");
           content.textContent = DEFAULT_NOTE_TEXT;
         }
+        storage.notes.list.find(i => i.article === article).text = content.textContent;
       });
+
+      function pm(e) {
+        if (ball.active) {
+          const max = controls.querySelector(".range-line").getBoundingClientRect().width-controls.querySelector(".range-ball").getBoundingClientRect().width/2+controls.querySelector(".range-line").getBoundingClientRect().height/2;
+          const newLeft = Math.min(Math.max(e.clientX-ball.start+ball.startLeft, 0), max);
+          controls.querySelector(".range-ball").style.left = newLeft+"px";
+          controls.querySelector(".range-line-progress").style.width = newLeft/max * controls.querySelector(".range-line").getBoundingClientRect().width+"px";
+          article.style.setProperty("--note-base", newLeft/max*(MAX_SIZE_NOTE-MIN_SIZE_NOTE)+MIN_SIZE_NOTE+"vw");
+        }
+        e.stopImmediatePropagation();
+        e.preventDefault();
+      }
+
+      function pu(e) {
+        if (ball.active) {
+          ball.active = false;
+        }
+      }
+
+      function pc(e) {
+        if (ball.active) ball.active = false;
+      }
+
+      const ball = {
+        active: false,
+        start: NaN,
+        startLeft: current_left,
+        progress: initial_progress
+      };
+
+      controls.querySelector(".range-ball").addEventListener("pointerdown", (e) => {
+        ball.active = true;
+        ball.startLeft = (controls.querySelector(".range-ball").getBoundingClientRect().x-controls.querySelector(".plus-minus-btns").getBoundingClientRect().x);
+        ball.start = e.clientX;
+        e.stopImmediatePropagation();
+        e.preventDefault();
+      });
+
+      document.body.addEventListener("pointermove", pm);
+
+      document.body.addEventListener("pointerup", pu);
+
+      document.body.addEventListener("pointercancel", pc);
 
       controls.querySelector(".delBtn").addEventListener("click", () => {
+        storage.notes.list.splice(storage.notes.list.indexOf(storage.notes.list.find(i => i.article === article)), 1);
         article.remove();
         showHud();
-      });
-
-      controls.querySelector(".dec-size").addEventListener("click", () => {
-        if (current_steps > 0) {
-          current_steps--;
-          current_size = MIN_SIZE_NOTE+(MAX_SIZE_NOTE-MIN_SIZE_NOTE)/NUM_STEPS*current_steps;
-          article.style.setProperty("--note-base", current_size+"vw");
-        }
-        showHud();
-      });
-
-      controls.querySelector(".inc-size").addEventListener("click", () => {
-        if (current_steps < NUM_STEPS) {
-          current_steps++;
-          current_size = MIN_SIZE_NOTE+(MAX_SIZE_NOTE-MIN_SIZE_NOTE)/NUM_STEPS*current_steps;
-          article.style.setProperty("--note-base", current_size+"vw");
-        }
-        showHud();
+        document.body.removeEventListener("pointermove", pm);
+        document.body.removeEventListener("pointerup", pu);
+        document.body.removeEventListener("pointercancel", pc);
       });
 
       setTimeout(() => {
@@ -853,6 +1004,8 @@
       }
       const newBase = Math.max(Math.min((timeDrag.baseNum * k).toFixed(4), MAX_SIZE), MIN_SIZE) + timeDrag.baseUnit;
       document.documentElement.style.setProperty("--time-base",newBase);
+
+      storage.time.size = newBase;
     }
 
     function endTimeResize(ev) {
@@ -876,12 +1029,34 @@
       h.addEventListener("dblclick", resetTimeSize);
     });
 
+    document.body.querySelectorAll(".time-hitbox").forEach(h => {
+      h.addEventListener("pointerdown", beginTimeResize);
+      h.addEventListener("pointermove", onTimeResizeMove);
+      h.addEventListener("pointerup", endTimeResize);
+      h.addEventListener("pointercancel", endTimeResize);
+      h.addEventListener("dblclick", resetTimeSize);
+    });
+
     /* =========================
        Boot
        ========================= */
     startTicking();
     showHud();
     createNote();
+
+
+    function bootFromStorage(storage) {
+      try {
+        const newBase = storage.time.size;
+        if (newBase) document.documentElement.style.setProperty("--time-base",newBase+"vw");
+
+        for (let i of storage.notes.list) {
+          createNote(i.text, false, i.size);
+        }
+      }
+      catch (e) {}
+    }
+
   })();
 </script>
 </body>
