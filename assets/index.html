@@ -104,13 +104,13 @@
     }
 
     .note{
-
+      cursor: text;
       font-family: 'Roboto Slab'; !important;
     }
 
     .block:hover .controls,
     .block[data-editing="true"] .controls,
-    .block:has(:focus-visible) .controls {
+    .block:has(:focus-visible) .controls, .being-resized .controls {
       opacity: 1; pointer-events: auto;
     }
 
@@ -275,6 +275,7 @@
       flex-direction: row;
       border-radius: 8px;
       border: 1px solid rgba(0, 0, 0, 0.15);
+      cursor: auto;
     }
 
     .range-line {
@@ -439,7 +440,7 @@
 <body>
 <main id="board" aria-live="polite">
   <!-- === Time block (always first) === -->
-  <section id="timeBlock" class="block time-block" data-mode="clock" aria-label="Time">
+  <section id="timeBlock" class="block time-block focusable" data-mode="clock" aria-label="Time">
     <div class="badge" id="editBadge">Editing time – use ↑/↓ to adjust, ←/→ to move, Enter to finish</div>
 
     <div class="time-wrap">
@@ -485,7 +486,7 @@
   </section>
 
   <!-- === Notes container === -->
-  <section id="notes"></section>
+  <div id="notes"></div>
 </main>
 
 <!-- Activity HUD -->
@@ -762,7 +763,7 @@
        ========================= */
     function createNote(initialText = DEFAULT_NOTE_TEXT, isDefault = true, initial_progress = INITIAL_STEPS) {
       const article = document.createElement("article");
-      article.className = "block note";
+      article.className = "block note focusable";
       let current_size = MIN_SIZE_NOTE+(MAX_SIZE_NOTE-MIN_SIZE_NOTE)*initial_progress;
       article.style.setProperty("--note-base", current_size+"vw");
 
@@ -842,19 +843,16 @@
           controls.querySelector(".range-ball").style.left = newLeft+"px";
           controls.querySelector(".range-line-progress").style.width = newLeft/max * controls.querySelector(".range-line").getBoundingClientRect().width+"px";
           article.style.setProperty("--note-base", newLeft/max*(MAX_SIZE_NOTE-MIN_SIZE_NOTE)+MIN_SIZE_NOTE+"vw");
+          e.stopImmediatePropagation();
+          e.preventDefault();
         }
-        e.stopImmediatePropagation();
-        e.preventDefault();
       }
 
       function pu(e) {
         if (ball.active) {
           ball.active = false;
+          controls.closest(".note").classList.remove("being-resized");
         }
-      }
-
-      function pc(e) {
-        if (ball.active) ball.active = false;
       }
 
       const ball = {
@@ -865,19 +863,38 @@
       };
 
       controls.querySelector(".range-ball").addEventListener("pointerdown", (e) => {
+        if (ball.active) return;
+        controls.closest(".note").classList.add("being-resized");
         ball.active = true;
         ball.startLeft = (controls.querySelector(".range-ball").getBoundingClientRect().x-controls.querySelector(".plus-minus-btns").getBoundingClientRect().x);
         ball.start = e.clientX;
         content.blur();
+        const element = content;
+        const selection = window.getSelection();
+
+        if (selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0);
+          if (element.contains(range.commonAncestorContainer)) {
+            selection.removeAllRanges();
+          }
+        }
         e.stopImmediatePropagation();
         e.preventDefault();
       });
+
+      // function blur(e) {
+      //   if (!e.target.closest(".notes") && document.activeElement === content) {
+      //     console.log(123);
+      //     // content.blur();
+      //   }
+      // }
 
       document.body.addEventListener("pointermove", pm);
 
       document.body.addEventListener("pointerup", pu);
 
-      document.body.addEventListener("pointercancel", pc);
+      document.body.addEventListener("pointercancel", pu);
+      // document.body.addEventListener("click", blur)
 
       controls.querySelector(".delBtn").addEventListener("click", () => {
         storage.notes.list.splice(storage.notes.list.indexOf(storage.notes.list.find(i => i.article === article)), 1);
@@ -886,6 +903,7 @@
         document.body.removeEventListener("pointermove", pm);
         document.body.removeEventListener("pointerup", pu);
         document.body.removeEventListener("pointercancel", pc);
+        document.body.removeEventListener("click", blur);
       });
 
       setTimeout(() => {
@@ -1057,6 +1075,22 @@
       }
       catch (e) {}
     }
+
+//     Clicking on empty space inside #notes should not refocus the last note.
+// Run in capture phase so it happens before the browser tries to place a caret.
+    notes.addEventListener("pointerdown", (e) => {
+      // If the click isn't inside a note's editable content, clear focus & selection.
+      if (!e.target.closest(".focusable")) {
+        const ae = document.activeElement;
+        if (ae && ae.isContentEditable) ae.blur();
+
+        const sel = window.getSelection?.();
+        try { sel && sel.removeAllRanges(); } catch {}
+
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      }
+    }, true);
 
   })();
 </script>
