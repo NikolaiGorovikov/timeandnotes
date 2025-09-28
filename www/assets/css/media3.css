@@ -1,0 +1,217 @@
+@media (pointer: coarse) {
+    .controls { inset: auto auto 10px 10px; } /* place controls bottom-left on touch devices */
+}
+
+@media (max-width: 550px) {
+    .time {
+        font-size: calc(var(--time-base) * var(--time-scale) * 0.93);
+    }
+    .time .side {
+        font-size: calc(var(--time-base) * var(--time-side-ratio) * var(--time-scale) * 1.17 * 0.93);
+        padding-right: calc(var(--time-base) * var(--time-side-ratio) * var(--time-scale) * 0.24 * 0.93);
+    }
+}
+
+@media (max-width: 350px) {
+    .time {
+        font-size: calc(var(--time-base) * var(--time-scale) * 0.85);
+    }
+    .time .side {
+        font-size: calc(var(--time-base) * var(--time-side-ratio) * var(--time-scale) * 1.17 * 0.85);
+        padding-right: calc(var(--time-base) * var(--time-side-ratio) * var(--time-scale) * 0.24 * 0.85);
+    }
+}
+
+@media (max-width: 280px) {
+    .time {
+        font-size: calc(var(--time-base) * var(--time-scale) * 0.8);
+    }
+    .time .side {
+        font-size: calc(var(--time-base) * var(--time-side-ratio) * var(--time-scale) * 1.17 * 0.8);
+        padding-right: calc(var(--time-base) * var(--time-side-ratio) * var(--time-scale) * 0.24 * 0.8);
+    }
+}
+
+@media (max-width: 190px) {
+    .time {
+        font-size: calc(var(--time-base) * var(--time-scale) * 0.77);
+    }
+    .time .side {
+        font-size: calc(var(--time-base) * var(--time-side-ratio) * var(--time-scale) * 1.17 * 0.77);
+        padding-right: calc(var(--time-base) * var(--time-side-ratio) * var(--time-scale) * 0.24 * 0.77);
+    }
+}
+
+@media (min-width: 700px) {
+    .btn {
+        border: 1.33px solid rgba(0,0,0,0.15);
+        padding: 6.66px;
+        border-radius: 10.66px;
+        font-size: 16px;
+        height: 16px;
+    }
+
+    .note button{
+        font-size: 16px;
+    }
+
+    .size-btn {
+        font-size: 16px;
+        height: 16px;
+        width: 16px;
+        padding: 6.66px; !important;
+    }
+
+    .plus-minus-btns{
+        height: 16px;
+        width: 133.33px;
+        margin-top: 6.66px;
+        margin-left: 6.66px;
+    }
+
+    .note-size-cover{
+        height: 32px;
+        width: 149.33px;
+        border-radius: 10.66px;
+        border: 1.33px solid rgba(0, 0, 0, 0.15);
+    }
+
+    .range-line {
+        height: 5.33px;
+        width: 122.66px;
+        border-radius: 200px;
+        left: 5.66px;
+        top: 5.66px;
+    }
+
+    .range-line-progress {
+        height: 5.66px;
+    }
+
+    .range-ball{
+        height: 16px;
+        width: 16px;
+        border-radius: 200px;
+    }
+
+    .note {
+        min-height: 46px;
+    }
+
+    .controls{
+        font-size: 16px;
+        border: 1.33px solid rgba(0,0,0,0.08);
+        backdrop-filter: blur(6.66px);
+    }
+    #timeControls{
+        height: 32px;
+        padding: 6.66px;
+        right: calc(0.7vw + 1.33px);
+        top: calc(0.7vw + 1.33px);
+    }
+
+    #modeToggle{
+        height: 16px;
+        width: 16px;
+    }
+
+    .countdown-text {
+        height: 16px;
+        line-height: 1.15;
+    }
+
+    .time-controls, .time-controls .toggle{
+        height: 16px;
+    }
+
+    .time-controls .toggle {
+        gap: 4px;
+    }
+}
+
+@media (min-width: 1100px) {
+    .btn {
+        border: 2px solid rgba(0,0,0,0.15);
+        padding: 10px;
+        border-radius: 16px;
+        font-size: 24px;
+        height: 24px;
+    }
+
+    .note button{
+        font-size: 24px;
+    }
+
+    .size-btn {
+        font-size: 24px;
+        height: 24px;
+        width: 24px;
+        padding: 10px; !important;
+    }
+
+    .plus-minus-btns{
+        height: 24px;
+        width: 200px;
+        margin-top: 10px;
+        margin-left: 10px;
+    }
+
+    .note-size-cover{
+        height: 48px;
+        width: 224px;
+        border-radius: 16px;
+        border: 2px solid rgba(0, 0, 0, 0.15);
+    }
+
+    .range-line {
+        height: 8px;
+        width: 184px;
+        border-radius: 400px;
+        left: 8px;
+        top: 8px;
+    }
+
+    .range-line-progress {
+        height: 8px;
+    }
+
+    .range-ball{
+        height: 24px;
+        width: 24px;
+        border-radius: 400px;
+    }
+
+    .note {
+        min-height: 46px;
+    }
+
+    .controls{
+        font-size: 24px;
+        border: 2px solid rgba(0,0,0,0.08);
+        backdrop-filter: blur(10px);
+    }
+    #timeControls{
+        height: 48px;
+        padding: 10px;
+        right: calc(0.7vw + 2px);
+        top: calc(0.7vw + 2px);
+    }
+
+    #modeToggle{
+        height: 24px;
+        width: 24px;
+    }
+
+    .countdown-text {
+        height: 24px;
+        line-height: 1.1;
+    }
+
+    .time-controls, .time-controls .toggle{
+        height: 24px;
+    }
+
+    .time-controls .toggle {
+        gap: 6px;
+    }
+}

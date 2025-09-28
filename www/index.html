@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Look at the board</title>
+
+  <style>
+    .still-loading {
+      display: flex;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .loading-animation{
+      margin: auto;
+      font-size: 10vw;
+    }
+
+    .loading-animation{
+      display: none;
+    }
+
+    body.still-loading * {
+      display: none; !important;
+    }
+
+    .still-loading .loading-animation{
+      display: block;
+    }
+
+    .still-loading .loading-animation * {
+      display: inline;
+    }
+
+    #period-1,
+    #period-2 {
+      opacity: 0;
+      animation-duration: 2s;
+      animation-timing-function: steps(1, end);
+      animation-iteration-count: infinite;
+    }
+
+    /* 2nd period shows only during the 2nd third of the cycle */
+    #period-1 {
+      animation-name: dot2;
+    }
+
+    /* 3rd period shows only during the last third of the cycle */
+    #period-2 {
+      animation-name: dot3;
+    }
+
+    @keyframes dot2 {
+      0%, 33.333%   { opacity: 0; }  /* .        */
+      33.334%,  100% { opacity: 1; }  /* ..       */
+    }
+
+    @keyframes dot3 {
+      0%, 66.666%   { opacity: 0; }  /* . and .. */
+      66.667%, 100% { opacity: 1; }  /* ...      */
+    }
+  </style>
+
+  <link rel="preload" href="/assets/css/fonts3.css" as="style" fetchpriority="high">
+  <link rel="stylesheet" href="/assets/css/fonts3.css" media="print" onload="this.media='all'" data-wait="true">
+
+  <link rel="preload" href="/assets/css/index3.css" as="style" fetchpriority="high">
+  <link rel="stylesheet" href="/assets/css/index3.css" media="print" onload="this.media='all'" data-wait="true">
+
+  <link rel="preload" href="/assets/css/media3.css" as="style" fetchpriority="high">
+  <link rel="stylesheet" href="/assets/css/media3.css" media="print" onload="this.media='all'" data-wait="true">
+
+  <link rel="preload" href="/assets/fonts/inter.ttf" as="font" type="font/ttf" crossorigin data-wait="true">
+  <link rel="preload" href="/assets/fonts/RobotoSlab.ttf" as="font" type="font/ttf" crossorigin data-wait="true">
+
+  <script async src="/assets/js/index.js" data-wait="true"></script>
+
+</head>
+<body class="still-loading">
+<div class="loading-animation">
+  <span>.</span>
+  <span id="period-1">.</span>
+  <span id="period-2">.</span>
+
+</div>
+<main id="board" aria-live="polite">
+  <!-- === Time block (always first) === -->
+  <section id="timeBlock" class="block time-block focusable" data-mode="clock" aria-label="Time">
+    <div class="badge" id="editBadge">Editing time – use ↑/↓ to adjust, ←/→ to move, Enter to finish</div>
+
+    <div class="time-wrap">
+      <div class="time" id="timeDisplay" role="group" aria-label="Current time">
+        <div class="main">
+          <span class="seg hh" id="hh" tabindex="0" aria-label="Hours" aria-selected="false">12</span>
+          <span class="colon">:</span>
+          <span class="seg mm" id="mm" tabindex="0" aria-label="Minutes" aria-selected="false">00</span>
+        </div>
+        <div class="side">
+          <span class="ampm seg" id="ampm" tabindex="0" aria-label="AM or PM" aria-selected="false">AM</span>
+          <span class="sec seg" tabindex="0" aria-label="Seconds" aria-selected="false">:<span id="ss" >00</span></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="time-resize-handle bl" id="timeHandleBL" title="Drag to scale time"></div>
+    <div class="time-resize-handle br" id="timeHandleBR" title="Drag to scale time"></div>
+    <div class="time-resize-handle bl brv" id="timeHandleBL2" title="Drag to scale time"></div>
+    <div class="time-resize-handle br brv" id="timeHandleBR2" title="Drag to scale time"></div>
+    <div class="time-resize-handle bc" id="timeHandleBC" title="Drag to scale time"></div>
+    <div class="time-resize-handle bl btop" id="timeHandleBLT"></div>
+    <div class="time-resize-handle br btop" id="timeHandleBRT"></div>
+    <div class="time-resize-handle bl btop brv" id="timeHandleBLT2"></div>
+    <div class="time-resize-handle br btop brv" id="timeHandleBRT2"></div>
+    <div class="time-resize-handle bc btop" id="timeHandleBCT"></div>
+
+    <div class="time-hitbox hit-b"></div>
+    <div class="time-hitbox hit-l"></div>
+    <div class="time-hitbox hit-r"></div>
+
+
+    <div class="controls" id="timeControls" style="display: none;">
+
+      <div class="group time-controls">
+        <label class="toggle">
+          <input type="checkbox" id="modeToggle" />
+          <span class="countdown-text">Countdown</span>
+          <div class="hitbox-2x"></div>
+        </label>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- === Notes container === -->
+  <div id="notes"></div>
+</main>
+
+<!-- Activity HUD -->
+<div id="hud" title="Click to add a new note (or start typing)">
+
+  <p>Click <span style="text-decoration: underline;">here</span> to create a new note or start typing</p>
+
+</div>
+
+<script>
+  function waitForAssets() {
+    const elements = document.querySelectorAll("[data-wait='true']");
+    const promises = Array.from(elements).map(el => {
+      return new Promise(resolve => {
+        if (el.tagName === "LINK" && el.rel === "stylesheet") {
+          // Stylesheets: wait for load
+          if (el.sheet) return resolve(); // already loaded
+          el.addEventListener("load", resolve, { once: true });
+          el.addEventListener("error", resolve, { once: true });
+        } else if (el.tagName === "LINK" && el.rel === "preload" && el.as === "font") {
+          // Fonts: use FontFaceSet API if available
+          if (document.fonts) {
+            const family = el.href.split("/").pop(); // crude name from filename
+            document.fonts.ready.then(resolve);
+          } else {
+            resolve();
+          }
+        } else if (el.tagName === "SCRIPT") {
+          if (el.readyState === "complete" || el.readyState === "loaded") return resolve();
+          el.addEventListener("load", resolve, { once: true });
+          el.addEventListener("error", resolve, { once: true });
+        } else {
+          // fallback for anything else
+          el.addEventListener("load", resolve, { once: true });
+          el.addEventListener("error", resolve, { once: true });
+        }
+      });
+    });
+
+    return Promise.all(promises);
+  }
+
+  waitForAssets().then(() => {
+    document.body.classList.remove("still-loading");
+    main();
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,439 @@
+/* ===== Base / Layout ===== */
+* { box-sizing: border-box; touch-action: none; -ms-touch-action: none;}
+html, body { height: 100%; }
+body {
+    margin: 0;
+    background: #fff;
+    color: #000;
+    font-family: "Inter";
+    line-height: 1.2;
+    -webkit-font-smoothing: antialiased;
+    font-variant-numeric: tabular-nums; /* avoid digit width jitter if supported */
+}
+
+:root {
+    --board-pad: clamp(10px, 1.5vw, 28px);
+    --block-gap: clamp(8px, 1.5vw, 20px);
+    --block-pad: clamp(8px, 1.25vw, 16px);
+    --radius: 12px;
+
+    /* Time sizes (user adjustable) */
+    --time-base: 16vw;              /* main HH:MM size basis */
+    --time-side-ratio: 0.36;        /* AM/PM + SS size vs HH:MM */
+    --time-scale: 1;                /* auto vertical fit scaling */
+    --time-width-scale: 1;          /* auto scale to fit width on one line */
+
+    /* Note sizes (per-note base is inline via style="--note-base: Npx") */
+    --note-scale-global: 1;         /* auto vertical fit scaling for notes */
+    --note-min: 14px;               /* floor for tiny squeeze */
+}
+
+#board {
+    padding: var(--board-pad);
+    display: flex;
+    flex-direction: column;
+    gap: var(--block-gap);
+    /*overflow-x: hidden;*/
+}
+
+#notes {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--block-gap) / 1.5);
+}
+
+.block {
+    position: relative;
+    border-radius: var(--radius);
+    padding: var(--block-pad);
+    border: 1px solid rgba(0,0,0,0.05);
+    /* Lightweight subtle elevation without stealing attention */
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.03), 0 1px 2px rgba(0,0,0,0.04);
+    background: #fff;
+    min-height: 38px;
+    display: flex;
+}
+
+/* ===== Controls on hover ===== */
+.controls{
+    position: absolute;
+    inset: 6px 8px auto auto; /* top-right */
+    display: flex;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 10px;
+    border: 1px solid rgba(0,0,0,0.08);
+    align-items: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 150ms ease;
+    backdrop-filter: blur(5px);
+    font-family: Inter;!important;
+    font-size: 12px;
+    user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    -webkit-user-select: none;
+    cursor: pointer;
+    overflow: hidden;
+}
+
+#timeControls *{
+    cursor: pointer;
+}
+
+#timeControls{
+    height: 24px;
+    padding: 5px;
+    line-height: 1;
+    vertical-align: center;
+    text-align: center;
+    right: calc(0.7vw + 2px);
+    top: calc(0.7vw + 2px);
+}
+
+#modeToggle{
+    padding: 0 0 0 0;
+    margin: 0 0 0 0;
+    height: 12px;
+    width: 12px;
+    display: inline-block;
+    accent-color: #000;
+}
+
+.countdown-text {
+    height: 12px;
+    display: inline-block;
+    margin: 0 0 0 0;
+    padding: 0 0 0 0;
+    line-height: 1.2;
+}
+
+.time-controls, .time-controls .toggle{
+    height: 12px;
+}
+
+.time-controls .toggle {
+    display: flex;
+    flex-direction: row;
+    gap: 3px;
+}
+
+
+.note .controls{
+    padding: 0 0 0 0;
+    border: none;
+    shadow: none;
+}
+
+.controls *{
+    font-family: Inter;!important;
+}
+
+.note{
+    cursor: text;
+    font-family: 'Roboto Slab'; !important;
+}
+
+.block:not(.grabbing .block):hover .controls,
+.block[data-editing="true"] .controls,
+.being-resized .controls {
+    opacity: 1; pointer-events: auto;
+}
+
+.controls label, .controls input, .controls .toggle {
+    font: inherit;
+}
+.controls input[type="range"] {
+    width: clamp(120px, 20vw, 260px);
+}
+.controls .group { display: inline-flex; gap: 8px; align-items: center; }
+
+.btn {
+    border: 1px solid rgba(0,0,0,0.15);
+    background: #fff;
+    padding: 5px;
+    border-radius: 8px;
+    cursor: pointer;
+    box-sizing: content-box;
+    font-size: 12px;
+    height: 12px;
+}
+.btn:hover { background: #f6f6f6; }
+.btn.danger { color: #b00020; border-color: rgba(176,0,32,0.25); }
+.btn.ghost { border-color: rgba(0,0,0,0.12); background: transparent; }
+
+/* ===== Time block ===== */
+.time-block {
+    display: grid;
+    place-items: center;
+}
+.time-wrap {
+    white-space: nowrap;
+    transform: scale(var(--time-width-scale));
+    transform-origin: center top;
+    will-change: transform;
+}
+.time {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.05em;
+    line-height: 1;
+    justify-content: center;
+    user-select: none;
+    /* main size (subject to global vertical fit scaling as well) */
+    font-size: calc(var(--time-base) * var(--time-scale));
+}
+.time .main {
+    display: inline-flex;
+    align-items: baseline;
+    font-weight: 600;
+}
+.time .main .seg {
+    display: inline-block;
+    min-width: 2ch; /* reserve width; combined with tabular-nums prevents shaking */
+    text-align: center;
+}
+.time .colon { display: inline-block; padding: 0 0.02em; transform: translateY(calc((-1)*var(--time-base)/11)); }
+.time .side {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.10em;
+    font-size: calc(var(--time-base) * var(--time-side-ratio) * var(--time-scale) * 1.17);
+    font-weight: 600;
+    line-height: 0.9;
+    padding-right: calc(var(--time-base) * var(--time-side-ratio) * var(--time-scale) * 0.24);
+}
+.time .ampm, .time .sec {
+    min-width: 2ch; text-align: center;
+}
+
+/* Visual cues when editing the time */
+.time .seg[aria-selected="true"] {
+    outline: 2px solid #0b57d0; /* blue ring */
+    outline-offset: 2px;
+    border-radius: 6px;
+    background: rgba(11,87,208,0.08);
+}
+.time-block[data-mode="countdown"] .ampm::after {
+    content: "LEFT"; font-size: 0.66em; letter-spacing: 0.08em;
+    display: block; opacity: 0.7; margin-top: 0.25em;
+}
+
+/* ===== Note blocks ===== */
+.note {
+    font-size: calc(var(--note-base, 64px) * var(--note-scale-global));
+}
+.note .content {
+    outline: none;
+    word-break: break-word;
+    margin: auto 0;
+}
+.note[data-default="true"] .content {
+    color: #8c8c8c;
+    font-style: italic;
+}
+
+/* ===== Activity helper (Add note prompt) ===== */
+#hud {
+    position: fixed;
+    width: 100%;
+    bottom: 14px;
+    left: 0;
+    display: flex;
+    padding: 0 7%;
+}
+#hud.visible p { opacity: 1; pointer-events: auto; cursor: pointer; }
+#hud p {
+    margin: auto;
+    background: rgba(255,255,255,0.95);
+    border: 1px solid rgba(0,0,0,0.12);
+    border-radius: 999px;
+    padding: 8px 14px;
+    font-size: 14px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms ease;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+    text-align: center;
+}
+
+/* Subtle help badge while editing time */
+.badge {
+    position: absolute;
+    left: 12px; top: 12px;
+    padding: 4px 8px; border-radius: 999px;
+    background: #0b57d0; color: #fff; font-size: 12px;
+    opacity: 0; transition: opacity 150ms ease;
+}
+.time-block[data-editing="true"] .badge { opacity: 1; }
+
+.note button{
+    font-family: Inter;!important;
+    font-size: 12px;
+    line-height: 1;
+}
+
+.size-btn {
+    font-size: 12px;
+    height: 12px;
+    line-height: 0.7;
+    width: 12px;
+    padding: 5px; !important;
+    box-sizing: content-box;
+}
+
+.plus-minus-btns{
+    display: flex;
+    flex-direction: row;
+    height: 12px;
+    width: 100px;
+    position: relative;
+    margin-top: 5px;
+    margin-left: 5px;
+}
+
+.note-size-cover{
+    height: 24px;
+    width: 112px;
+    display: flex;
+    flex-direction: row;
+    border-radius: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    cursor: auto;
+}
+
+.range-line {
+    position: absolute;
+    height: 4px;
+    width: 92px;
+    background-color: rgba(230,230,230);
+    border-radius: 100px;
+    left: 4px;
+    top: 4px;
+    overflow: hidden;
+}
+
+.range-line-progress {
+    position: absolute;
+    top:0;
+    bottom: 0;
+    height: 4px;
+    background-color: rgba(160,160,160);
+}
+
+.range-ball{
+    position: absolute;
+    height: 12px;
+    width: 12px;
+    border-radius: 100px;
+    background-color: #000;
+    left: 0;
+    top: 0;
+    cursor: grab;
+}
+
+.time-resize-handle:not(.time-resize-handle.btop):active, .range-ball:active {
+    cursor: grabbing;
+}
+
+.btn:active {
+    background-color: rgba(0,0,0,0.15);
+}
+
+.btn.danger:active{
+    background-color: rgba(176,0,32,0.25);
+}
+
+/* Responsiveness / accessibility tweaks */
+
+
+.time-resize-handle {
+    position: absolute;
+    width: 5vw;
+    height: 1vw;
+    bottom: -0.5vw;                 /* sit just outside so they don't affect height */
+    border-color: #000;
+    background-color: #000;
+    border-radius: 4px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease;
+    touch-action: none;
+    z-index: 3;/* enable smooth pointer events on touch */
+}
+
+.time-hitbox{
+    position: absolute;
+    z-index: 1;
+}
+
+.time-hitbox:active{
+    cursor: grabbing;
+}
+
+.time-hitbox.hit-b{
+    width: 100%;
+    height: 15%;
+    bottom: -3%;
+    left: 0;
+    z-index: 2;
+    cursor: ns-resize;
+}
+
+.time-hitbox.hit-l{
+    width: 3.5%;
+    height: 50%;
+    bottom: 0;
+    left: -1%;
+    cursor: nesw-resize;
+}
+
+.time-hitbox.hit-r{
+    width: 3.5%;
+    height: 50%;
+    bottom: 0;
+    right: -1%;
+    cursor: nwse-resize;
+}
+
+.time-block:not(.grabbing .time-block):hover .time-resize-handle,
+.time-block:has(:focus-visible) .time-resize-handle {
+    opacity: 1; pointer-events: auto;
+}
+.time-resize-handle.br { right: -0.5vw; cursor: nwse-resize; }
+.time-resize-handle.bl { left:  -0.5vw; cursor: nesw-resize; }
+.time-resize-handle.bc { left:  calc(50% -0.5vw); cursor: ns-resize; width: 8vw;}
+
+.time-resize-handle.br.brv { right: -0.5vw; cursor: nwse-resize; height: 5vw; width: 1vw;}
+.time-resize-handle.bl.brv { left:  -0.5vw; cursor: nesw-resize; height: 5vw; width: 1vw;}
+
+.time-resize-handle.bl.btop, .time-resize-handle.br.btop {cursor: not-allowed;}
+
+.time-resize-handle.btop {bottom: auto; top: -0.5vw;  cursor: not-allowed; background: rgba(200,200,200);
+    border: 1px solid rgba(200,200,200);}
+
+/* While dragging, prevent accidental text selection */
+body.time-resizing, body.time-resizing *{
+    user-select: none !important;
+    -webkit-user-select: none !important;
+}
+
+.grabbing *, .grabbing{
+    cursor: grabbing; !important;
+}
+
+#ampm{
+    min-width: 2.5ch;
+}
+
+.hitbox-2x{
+    position: absolute;
+    left: 0;
+    top: 0;
+    width:100%;
+    height: 100%;
+    transform: scale(2);
+}
