@@ -588,17 +588,18 @@ function main() {
         }
     }, true);
 
-    document.addEventListener("resize", (e) => {
+    window.addEventListener("resize", (e) => {
         const controls_list = document.body.querySelectorAll(".note .controls");
         for (let i = 0; i < controls_list.length; i++) {
+            console.log(123);
             const controls = controls_list[i];
             const max = controls.querySelector(".range-line").getBoundingClientRect().width-controls.querySelector(".range-ball").getBoundingClientRect().width/2+controls.querySelector(".range-line").getBoundingClientRect().height/2;
             const percentage = controls.querySelector(".range-ball").percentage;
             const new_left = max*percentage;
             controls.querySelector(".range-ball").style.left = new_left + "px";
+            controls.querySelector(".range-line-progress").style.width = percentage * controls.querySelector(".range-line").getBoundingClientRect().width+"px";
         }
-
-    })
+    });
 
 }
 

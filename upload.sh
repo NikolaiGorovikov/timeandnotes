@@ -9,6 +9,7 @@
 # Notes:
 # - Uploads from the *current directory* to the bucket root.
 # - Sets long-term caching for immutable assets; HTML is no-cache.
+# - Special fixed-URL files (robots.txt, favicon.ico, etc.) are re-uploaded LAST with overrides.
 # - If a CloudFront Distribution ID is provided, creates an invalidation.
 
 set -euo pipefail
@@ -38,6 +39,15 @@ EXCLUDES=(
 CACHE_IMMUTABLE="public,max-age=31536000,immutable"
 CACHE_HTML="no-cache, must-revalidate"
 
+# Special-file cache policies (tweak to taste)
+CACHE_ROBOTS="public,max-age=3600"           # 1h: crawlers should see updates relatively quickly
+CACHE_FAVICON="$CACHE_IMMUTABLE"             # 1y immutable: favicons rarely change
+CACHE_SITEMAP="public,max-age=86400"         # 1d: reasonable for search engines
+CACHE_SW="no-cache, must-revalidate"         # service workers must update promptly
+CACHE_MANIFEST="public,max-age=3600"         # manifests can change without renaming
+CACHE_AASA="public,max-age=86400"            # apple-app-site-association / assetlinks.json
+CACHE_SECURITY="public,max-age=86400"        # security.txt (well-known)
+
 # Helper to upload a set of extensions with a single metadata rule
 #   upload_set "text/css" "$CACHE_IMMUTABLE" css
 upload_set() {
@@ -45,20 +55,17 @@ upload_set() {
   local cache_control="$1"; shift
   local exts=( "$@" )
 
-  # Base args; start with a blanket exclude
   local args=( aws s3 cp . "s3://$BUCKET/" --recursive --only-show-errors \
                --exclude "*" \
                --cache-control "$cache_control" \
                --content-type "$content_type" )
 
-  # Narrow to desired extensions
   local had_include=false
   for ext in "${exts[@]}"; do
     args+=( --include "*.${ext}" )
     had_include=true
   done
 
-  # Apply your common excludes *after* includes so they still win
   args+=( "${EXCLUDES[@]}" )
 
   if [[ "$had_include" = true ]]; then
@@ -67,12 +74,29 @@ upload_set() {
   fi
 }
 
+# Helper to upload a single, exact path with given metadata if it exists
+#   upload_exact "robots.txt" "text/plain; charset=utf-8" "$CACHE_ROBOTS"
+upload_exact() {
+  local rel_path="$1"
+  local content_type="$2"
+  local cache_control="$3"
+
+  if [[ -f "$rel_path" ]]; then
+    echo "→ Overriding: $rel_path  (type: $content_type; cache: $cache_control)"
+    aws s3 cp "$rel_path" "s3://$BUCKET/$rel_path" \
+      --only-show-errors \
+      --cache-control "$cache_control" \
+      --content-type "$content_type"
+  fi
+}
+
 echo "Deploying current directory to s3://$BUCKET ..."
 
 # 1) Upload immutable/static assets first (long cache)
 upload_set "text/css"              "$CACHE_IMMUTABLE" css
 upload_set "text/javascript"       "$CACHE_IMMUTABLE" js mjs cjs
-upload_set "application/json"      "$CACHE_IMMUTABLE" json webmanifest map
+upload_set "application/json"      "$CACHE_IMMUTABLE" json map
+upload_set "application/manifest+json" "$CACHE_IMMUTABLE" webmanifest
 upload_set "image/svg+xml"         "$CACHE_IMMUTABLE" svg
 upload_set "image/png"             "$CACHE_IMMUTABLE" png
 upload_set "image/jpeg"            "$CACHE_IMMUTABLE" jpg jpeg
@@ -100,7 +124,40 @@ aws s3 sync . "s3://$BUCKET/" \
   --include "*.*" \
   --delete
 
-# 4) Optional CloudFront invalidation
+# 4) Special fixed-URL overrides (uploaded LAST so metadata wins)
+
+# robots.txt (short cache)
+upload_exact "robots.txt" "text/plain; charset=utf-8" "$CACHE_ROBOTS"
+
+# favicon.ico (long cache)
+upload_exact "favicon.ico" "image/x-icon" "$CACHE_FAVICON"
+
+## Sitemaps (moderate cache)
+#upload_exact "sitemap.xml" "application/xml; charset=utf-8" "$CACHE_SITEMAP"
+#upload_exact "sitemap_index.xml" "application/xml; charset=utf-8" "$CACHE_SITEMAP"
+#
+## Service workers (no-cache; ensure browsers revalidate)
+#upload_exact "sw.js" "text/javascript; charset=utf-8" "$CACHE_SW"
+#upload_exact "service-worker.js" "text/javascript; charset=utf-8" "$CACHE_SW"
+#
+## Web App Manifest (short cache if not versioned)
+#upload_exact "manifest.json" "application/manifest+json; charset=utf-8" "$CACHE_MANIFEST"
+#upload_exact "site.webmanifest" "application/manifest+json; charset=utf-8" "$CACHE_MANIFEST"
+#
+## App/site association files (JSON, usually without extensions)
+#upload_exact "apple-app-site-association" "application/json; charset=utf-8" "$CACHE_AASA"
+#upload_exact ".well-known/apple-app-site-association" "application/json; charset=utf-8" "$CACHE_AASA"
+#upload_exact ".well-known/assetlinks.json" "application/json; charset=utf-8" "$CACHE_AASA"
+#
+## security.txt (RFC 9116) — try well-known first
+#upload_exact ".well-known/security.txt" "text/plain; charset=utf-8" "$CACHE_SECURITY"
+#upload_exact "security.txt" "text/plain; charset=utf-8" "$CACHE_SECURITY"
+#
+## Optional: touch common Apple touch icons (you may change cache policy if you expect frequent updates)
+#upload_exact "apple-touch-icon.png" "image/png" "$CACHE_FAVICON"
+#upload_exact "apple-touch-icon-precomposed.png" "image/png" "$CACHE_FAVICON"
+
+# 5) Optional CloudFront invalidation
 if [[ -n "$CF_DIST_ID" ]]; then
   echo "→ Creating CloudFront invalidation /* for distribution $CF_DIST_ID"
   aws cloudfront create-invalidation \
