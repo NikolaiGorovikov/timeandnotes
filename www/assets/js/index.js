@@ -4,7 +4,7 @@ function main() {
     /* =========================
        State & constants
        ========================= */
-    const DEFAULT_NOTE_TEXT = "Look at the board for new announcements";
+    const DEFAULT_NOTE_TEXT = "New notes will go here";
     const MAX_SIZE = 25;
     const MIN_SIZE = 8;
 
@@ -266,6 +266,7 @@ function main() {
         const article = document.createElement("article");
         article.className = "block note focusable";
         let current_size = MIN_SIZE_NOTE+(MAX_SIZE_NOTE-MIN_SIZE_NOTE)*initial_progress;
+
         article.style.setProperty("--note-base", current_size+"vw");
 
         storage.notes.list.push({
@@ -344,6 +345,7 @@ function main() {
                 controls.querySelector(".range-ball").style.left = newLeft+"px";
                 controls.querySelector(".range-line-progress").style.width = newLeft/max * controls.querySelector(".range-line").getBoundingClientRect().width+"px";
                 article.style.setProperty("--note-base", newLeft/max*(MAX_SIZE_NOTE-MIN_SIZE_NOTE)+MIN_SIZE_NOTE+"vw");
+                controls.querySelector(".range-ball").percentage = newLeft/max;
                 e.stopImmediatePropagation();
                 e.preventDefault();
             }
@@ -363,6 +365,8 @@ function main() {
             startLeft: current_left,
             progress: initial_progress
         };
+
+        controls.querySelector(".range-ball").percentage = initial_progress;
 
         controls.querySelector(".range-ball").addEventListener("pointerdown", (e) => {
             if (ball.active) return;
@@ -583,6 +587,18 @@ function main() {
             e.stopImmediatePropagation();
         }
     }, true);
+
+    document.addEventListener("resize", (e) => {
+        const controls_list = document.body.querySelectorAll(".note .controls");
+        for (let i = 0; i < controls_list.length; i++) {
+            const controls = controls_list[i];
+            const max = controls.querySelector(".range-line").getBoundingClientRect().width-controls.querySelector(".range-ball").getBoundingClientRect().width/2+controls.querySelector(".range-line").getBoundingClientRect().height/2;
+            const percentage = controls.querySelector(".range-ball").percentage;
+            const new_left = max*percentage;
+            controls.querySelector(".range-ball").style.left = new_left + "px";
+        }
+
+    })
 
 }
 

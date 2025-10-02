@@ -2,8 +2,16 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <meta name="description" content="A tool to display local time (adjustable size, make it very big so everyone can see!) and add notes if needed.">
+
+  <meta property="og:title" content="Time and Notes">
+  <meta property="og:description" content="Display the time and add notes.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://www.timeandnotes.com/">
+  <meta property="og:image" content="https://www.timeandnotes.com/preview.png">
+
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Look at the board</title>
+  <title>Time and Notes</title>
 
   <style>
     .still-loading {
@@ -88,7 +96,6 @@
 <main id="board" aria-live="polite">
   <!-- === Time block (always first) === -->
   <section id="timeBlock" class="block time-block focusable" data-mode="clock" aria-label="Time">
-    <div class="badge" id="editBadge">Editing time – use ↑/↓ to adjust, ←/→ to move, Enter to finish</div>
 
     <div class="time-wrap">
       <div class="time" id="timeDisplay" role="group" aria-label="Current time">

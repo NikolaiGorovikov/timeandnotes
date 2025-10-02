@@ -1,7 +1,3 @@
-@media (pointer: coarse) {
-    .controls { inset: auto auto 10px 10px; } /* place controls bottom-left on touch devices */
-}
-
 @media (max-width: 550px) {
     .time {
         font-size: calc(var(--time-base) * var(--time-scale) * 0.93);
