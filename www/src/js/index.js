@@ -136,6 +136,7 @@ export function main() {
         ampmEl.textContent = mer;
     }
 
+
     function renderCountdown() {
         let remaining = 0;
         if (timeState.countdown.byEndTime && timeState.countdown.endTimestamp) {
