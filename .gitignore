@@ -28,3 +28,6 @@ terraform.rc
 
 # Ignore lock file (if you don’t want to commit provider versions)
 .terraform.lock.hcl
+
+.idea
+.idea/*
