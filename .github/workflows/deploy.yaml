@@ -54,7 +54,7 @@ jobs:
         run: |
           aws s3 sync dist s3://${{ vars.S3_BUCKET }} \
             --exclude "*.html" \
-            --exclude "robots.txt" " --exclude "sitemap.xml" \
+            --exclude "robots.txt" --exclude "sitemap.xml" \
             --exclude "manifest.json" --exclude "service-worker.js" --exclude "sw.js" \
             --cache-control "public, max-age=31536000, immutable" --delete
 
