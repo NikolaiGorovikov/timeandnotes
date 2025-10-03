@@ -8,12 +8,12 @@
   <meta property="og:description" content="Display local time and add notes.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://www.timeandnotes.com/">
-  <meta property="og:image" content="https://www.timeandnotes.com/assets/img/favicon.png">
+  <meta property="og:image" content="https://www.timeandnotes.com/favicon.png">
 
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="Time and Notes">
   <meta name="twitter:description" content="Display local time and add notes.">
-  <meta name="twitter:image" content="https://www.timeandnotes.com/assets/img/favicon.png">
+  <meta name="twitter:image" content="https://www.timeandnotes.com/favicon.png">
 
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="theme-color" content="#AAA">
@@ -78,17 +78,17 @@
     }
   </style>
 
-  <link rel="preload" href="/assets/css/fonts.2.css" as="style" fetchpriority="high">
-  <link rel="stylesheet" href="/assets/css/fonts.2.css" media="print" onload="this.media='all'" data-wait="true">
+  <link rel="preload" href="/src/css/fonts.css" as="style" fetchpriority="high">
+  <link rel="stylesheet" href="/src/css/fonts.css" media="print" onload="this.media='all'" data-wait="true">
 
-  <link rel="preload" href="/assets/css/index.2.css" as="style" fetchpriority="high">
-  <link rel="stylesheet" href="/assets/css/index.2.css" media="print" onload="this.media='all'" data-wait="true">
+  <link rel="preload" href="/src/css/index.css" as="style" fetchpriority="high">
+  <link rel="stylesheet" href="/src/css/index.css" media="print" onload="this.media='all'" data-wait="true">
 
-  <link rel="preload" href="/assets/css/media.2.css" as="style" fetchpriority="high">
-  <link rel="stylesheet" href="/assets/css/media.2.css" media="print" onload="this.media='all'" data-wait="true">
+  <link rel="preload" href="/src/css/media.css" as="style" fetchpriority="high">
+  <link rel="stylesheet" href="/src/css/media.css" media="print" onload="this.media='all'" data-wait="true">
 
-  <link rel="preload" href="/assets/fonts/inter.ttf" as="font" type="font/ttf" crossorigin data-wait="true">
-  <link rel="preload" href="/assets/fonts/RobotoSlab.ttf" as="font" type="font/ttf" crossorigin data-wait="true">
+  <link rel="preload" href="/src/fonts/inter.ttf" as="font" type="font/ttf" crossorigin data-wait="true">
+  <link rel="preload" href="/src/fonts/RobotoSlab.ttf" as="font" type="font/ttf" crossorigin data-wait="true">
 
   <script>
     // Configure BEFORE loading the script
@@ -100,13 +100,13 @@
         processEscapes: false,
       },
       svg: { fontCache: 'global' },
-      loader: { paths: { mathjax: '/assets/mathjax' } },
+      loader: { paths: { mathjax: '/vendor/mathjax' } },
       startup: { typeset: false }
     };
   </script>
 
-  <script async src="/assets/js/index.3.js" data-wait="true"></script>
-  <script async src="/assets/mathjax/es5/tex-svg.js" data-wait="true"></script>
+  <script type="module" src="/src/js/index.js"></script>
+  <script async src="/vendor/mathjax/es5/tex-svg.js" data-wait="true"></script>
 
 </head>
 <body class="still-loading">
@@ -174,7 +174,9 @@
 
 </div>
 
-<script>
+<script type="module">
+  import { main } from '/src/js/index.js'
+
   function waitForAssets() {
     const elements = document.querySelectorAll("[data-wait='true']");
     const promises = Array.from(elements).map(el => {

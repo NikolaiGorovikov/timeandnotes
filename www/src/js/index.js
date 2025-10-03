@@ -1,4 +1,4 @@
-function main() {
+export function main() {
     "use strict";
 
     /* =========================
