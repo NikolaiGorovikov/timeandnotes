@@ -427,15 +427,16 @@ data "aws_iam_policy_document" "assume_role" {
     }
 
     # Examples if you later want to allow more (uncomment & adjust):
-    # condition {
-    #   test     = "StringLike"
-    #   variable = "token.actions.githubusercontent.com:sub"
-    #   values   = [
-    #     "repo:${var.github_owner}/${var.github_repo}:ref:refs/heads/main",
-    #     "repo:${var.github_owner}/${var.github_repo}:ref:refs/tags/*",
-    #     "repo:${var.github_owner}/${var.github_repo}:pull_request"
-    #   ]
-    # }
+     condition {
+       test     = "StringLike"
+       variable = "token.actions.githubusercontent.com:sub"
+       values   = [
+         "repo:${var.github_owner}/${var.github_repo}:ref:refs/heads/main",
+         "repo:${var.github_owner}/${var.github_repo}:ref:refs/tags/*",
+         "repo:${var.github_owner}/${var.github_repo}:pull_request",
+         "repo:${var.github_owner}/${var.github_repo}:environment:prod"
+       ]
+     }
   }
 }
 
