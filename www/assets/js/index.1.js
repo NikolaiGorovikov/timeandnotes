@@ -293,7 +293,9 @@ function main() {
 <div class="range-line">
     <div class="range-line-progress"></div>
 </div>
-<div class="range-ball"></div>
+<div class="range-ball">
+<div class="ball-hitbox"></div>
+</div>
 
 </div>
 
@@ -312,6 +314,7 @@ function main() {
         controls.querySelector(".range-ball").style.left = current_left+"px";
 
         content.addEventListener("input", () => {
+            content.plainText = content.textContent;
             if (article.hasAttribute("data-default")) {
                 article.removeAttribute("data-default");
             }
@@ -324,18 +327,50 @@ function main() {
             }
         });
 
-        content.addEventListener("focus", () => {
+        function latexise() {
+            MathJax.typesetPromise([content]).then(()=>{
+                const errors = content.querySelectorAll('g[fill="red"]');
+                for (let i = 0; i < errors.length; i++) {
+                    errors[i].setAttribute("fill", "rgb(176,0,32)");
+                    errors[i].setAttribute("stroke", "rgb(176,0,32)");
+                }
+            });
+        }
+
+        content.addEventListener("focus", (e) => {
+            // show text
+            content.isFocused = true;
             if (article.dataset.default === "true") {
                 setTimeout(() => document.execCommand("selectAll", false, null), 0);
             }
         });
 
         content.addEventListener("blur", () => {
+            // show latex
+            content.textContent = content.plainText;
+            latexise();
+            content.isFocused = false;
             if (content.textContent.trim() === "") {
                 article.setAttribute("data-default","true");
                 content.textContent = DEFAULT_NOTE_TEXT;
             }
             storage.notes.list.find(i => i.article === article).text = content.textContent;
+        });
+
+        content.parentElement.addEventListener("pointerenter", (e) => {
+            // Show text
+            content.pointerInside = true;
+            if (!article.hasAttribute("data-default")) content.textContent = content.plainText;
+        });
+
+        content.parentElement.addEventListener("pointerleave", (e) => {
+            // Show latex
+            content.pointerInside = false;
+
+            if (!content.isFocused && !article.hasAttribute("data-default")) {
+                latexise();
+                content.blur();
+            }
         });
 
         function pm(e) {
@@ -591,7 +626,6 @@ function main() {
     window.addEventListener("resize", (e) => {
         const controls_list = document.body.querySelectorAll(".note .controls");
         for (let i = 0; i < controls_list.length; i++) {
-            console.log(123);
             const controls = controls_list[i];
             const max = controls.querySelector(".range-line").getBoundingClientRect().width-controls.querySelector(".range-ball").getBoundingClientRect().width/2+controls.querySelector(".range-line").getBoundingClientRect().height/2;
             const percentage = controls.querySelector(".range-ball").percentage;
@@ -600,6 +634,7 @@ function main() {
             controls.querySelector(".range-line-progress").style.width = percentage * controls.querySelector(".range-line").getBoundingClientRect().width+"px";
         }
     });
+
 
 }
 

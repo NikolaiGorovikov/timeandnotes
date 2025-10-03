@@ -399,6 +399,10 @@ body {
     cursor: nwse-resize;
 }
 
+.time-hitbox.hit-r:active, .time-hitbox.hit-l:active, .time-hitbox.hit-b:active{
+    cursor: grabbing;
+}
+
 .time-block:not(.grabbing .time-block):hover .time-resize-handle,
 .time-block:has(:focus-visible) .time-resize-handle {
     opacity: 1; pointer-events: auto;
@@ -436,4 +440,18 @@ body.time-resizing, body.time-resizing *{
     width:100%;
     height: 100%;
     transform: scale(2);
+}
+
+.hitbox-2x:active{
+    cursor: grabbing;
+}
+
+.ball-hitbox{
+    width: 200%;
+    height: 200%;
+    position: absolute;
+    left: -50%;
+    top: -50%;
+    background-color: transparent;
+    border-radius: 100px;
 }
