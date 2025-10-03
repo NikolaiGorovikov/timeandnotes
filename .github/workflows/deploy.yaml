@@ -7,6 +7,10 @@ on:
       - 'www/**'
       - '.github/workflows/deploy.yml'
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
