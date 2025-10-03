@@ -4,7 +4,7 @@ function main() {
     /* =========================
        State & constants
        ========================= */
-    const DEFAULT_NOTE_TEXT = "New notes will go here";
+    const DEFAULT_NOTE_TEXT = "New notes like $x^2 \\geq 1$ will go here";
     const MAX_SIZE = 25;
     const MIN_SIZE = 8;
 
@@ -262,7 +262,7 @@ function main() {
     /* =========================
        Note block creation / behavior (unchanged)
        ========================= */
-    function createNote(initialText = DEFAULT_NOTE_TEXT, isDefault = true, initial_progress = INITIAL_STEPS) {
+    function createNote({initialText = DEFAULT_NOTE_TEXT, isDefault = true, initial_progress = INITIAL_STEPS, first = false} = {}) {
         const article = document.createElement("article");
         article.className = "block note focusable";
         let current_size = MIN_SIZE_NOTE+(MAX_SIZE_NOTE-MIN_SIZE_NOTE)*initial_progress;
@@ -341,18 +341,20 @@ function main() {
             // show text
             content.isFocused = true;
             if (article.dataset.default === "true") {
+                content.textContent = initialText;
                 setTimeout(() => document.execCommand("selectAll", false, null), 0);
             }
         });
 
         content.addEventListener("blur", () => {
             // show latex
-            content.textContent = content.plainText;
+            if (article.dataset.default !== "true") content.textContent = content.plainText;
             latexise();
             content.isFocused = false;
             if (content.textContent.trim() === "") {
                 article.setAttribute("data-default","true");
                 content.textContent = DEFAULT_NOTE_TEXT;
+                latexise();
             }
             storage.notes.list.find(i => i.article === article).text = content.textContent;
         });
@@ -439,11 +441,15 @@ function main() {
 
         setTimeout(() => {
             content.textContent = initialText;
-            content.focus();
-            placeCaretAtEnd(content);
+            if (first) latexise();
+            else {
+                content.focus();
+                placeCaretAtEnd(content);
+            }
         }, 0);
 
         if (!isDefault) article.removeAttribute("data-default");
+
 
         return {article, content};
     }
@@ -470,7 +476,7 @@ function main() {
         const isField = ae && (ae.isContentEditable || /^(input|textarea|select|button)$/i.test(ae.tagName));
         if (!isField && isPrintableKey(e)) {
             e.preventDefault();
-            createNote(e.key, false);
+            createNote({initialText: e.key, isDefault: false});
         }
     });
 
@@ -592,7 +598,15 @@ function main() {
        ========================= */
     startTicking();
     showHud();
-    createNote();
+    createNote({first: true});
+
+    // setTimeout(()=>{
+    //     document.querySelector(".controls").blur();
+    //     try {
+    //         window.getSelection?.().removeAllRanges();
+    //     }
+    //     catch (e) {}
+    // })
 
 
     function bootFromStorage(storage) {
@@ -601,7 +615,7 @@ function main() {
             if (newBase) document.documentElement.style.setProperty("--time-base",newBase+"vw");
 
             for (let i of storage.notes.list) {
-                createNote(i.text, false, i.size);
+                createNote({initialText: i.text, isDefault: false, initial_progress: i.size});
             }
         }
         catch (e) {}
