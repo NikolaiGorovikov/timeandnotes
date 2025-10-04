@@ -1,325 +1,14 @@
-
-
-
-############################################################
-# ROUTE 53 ZONE (assumes your domain is hosted in Route 53)
-############################################################
 data "aws_route53_zone" "this" {
   name         = var.domain_name
   private_zone = false
 }
 
-############################################################
-# S3 BUCKET (private, OAC-only)
-############################################################
 resource "aws_s3_bucket" "site" {
   bucket = local.fqdn
+  force_destroy = true
 }
 
-resource "aws_s3_bucket_ownership_controls" "site" {
-  bucket = aws_s3_bucket.site.id
-  rule {
-    object_ownership = "BucketOwnerEnforced"
-  }
-}
-
-resource "aws_s3_bucket_public_access_block" "site" {
-  bucket                  = aws_s3_bucket.site.id
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
-}
-
-resource "aws_s3_bucket_versioning" "site" {
-  bucket = aws_s3_bucket.site.id
-  versioning_configuration {
-    status = "Enabled"
-  }
-}
-
-resource "aws_s3_bucket_server_side_encryption_configuration" "site" {
-  bucket = aws_s3_bucket.site.id
-  rule {
-    apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
-    }
-  }
-}
-
-############################################################
-# ACM CERTIFICATE (us-east-1 for CloudFront)
-############################################################
-resource "aws_acm_certificate" "cf" {
-  provider          = aws.us_east_1
-  domain_name       = var.domain_name                  # apex, e.g., timeandnotes.com
-  subject_alternative_names = [
-    local.fqdn                                         # e.g., www.timeandnotes.com
-  ]
-  validation_method = "DNS"
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-resource "aws_route53_record" "cert_validation" {
-  for_each = {
-  for dvo in aws_acm_certificate.cf.domain_validation_options : dvo.domain_name => {
-    name  = dvo.resource_record_name
-    type  = dvo.resource_record_type
-    value = dvo.resource_record_value
-  }
-  }
-
-  zone_id = data.aws_route53_zone.this.zone_id
-  name    = each.value.name
-  type    = each.value.type
-  ttl     = 60
-  records = [each.value.value]
-}
-
-resource "aws_acm_certificate_validation" "cf" {
-  provider                = aws.us_east_1
-  certificate_arn         = aws_acm_certificate.cf.arn
-  validation_record_fqdns = [for r in aws_route53_record.cert_validation : r.fqdn]
-}
-
-############################################################
-# CLOUDFRONT: OAC + Response Headers Policy (security)
-############################################################
-resource "aws_cloudfront_origin_access_control" "oac" {
-  name                              = "oac-${local.fqdn}"
-  description                       = "OAC for ${local.fqdn}"
-  origin_access_control_origin_type = "s3"
-  signing_behavior                  = "always"
-  signing_protocol                  = "sigv4"
-}
-
-# Security headers (HSTS, X-Frame-Options, etc.)
-resource "aws_cloudfront_response_headers_policy" "security" {
-  name = local.policy_name_clean
-
-  security_headers_config {
-    content_type_options { override = true }
-    frame_options        {
-      frame_option = "DENY"
-      override = true
-    }
-    referrer_policy      {
-      referrer_policy = "strict-origin-when-cross-origin"
-      override = true
-    }
-    strict_transport_security {
-      access_control_max_age_sec = 63072000
-      include_subdomains         = true
-      preload                    = true
-      override                   = true
-    }
-    xss_protection {
-      mode_block = true
-      protection = true
-      override = true
-    }
-  }
-}
-
-# Use AWS managed "CachingOptimized" policy
-data "aws_cloudfront_cache_policy" "managed_optimized" {
-  name = "Managed-CachingOptimized"
-}
-
-resource "aws_cloudfront_distribution" "this" {
-  enabled             = true
-  is_ipv6_enabled     = true
-  comment             = local.fqdn
-  default_root_object = "index.html"
-
-  aliases = [local.fqdn, var.domain_name]
-
-  origin {
-    domain_name              = aws_s3_bucket.site.bucket_regional_domain_name
-    origin_id                = "s3-${aws_s3_bucket.site.id}"
-    origin_access_control_id = aws_cloudfront_origin_access_control.oac.id
-  }
-
-  default_cache_behavior {
-    target_origin_id       = "s3-${aws_s3_bucket.site.id}"
-    viewer_protocol_policy = "redirect-to-https"
-
-    allowed_methods = ["GET", "HEAD"]
-    cached_methods  = ["GET", "HEAD"]
-    compress        = true
-
-    function_association {
-      event_type   = "viewer-request"
-      function_arn = aws_cloudfront_function.redirect_apex_to_www.arn
-    }
-
-    cache_policy_id            = data.aws_cloudfront_cache_policy.managed_optimized.id
-    response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
-  }
-
-  restrictions {
-    geo_restriction {
-      restriction_type = "none"
-    }
-  }
-
-  viewer_certificate {
-    acm_certificate_arn            = aws_acm_certificate_validation.cf.certificate_arn
-    ssl_support_method             = "sni-only"
-    minimum_protocol_version       = "TLSv1.2_2021"
-  }
-}
-
-resource "aws_route53_record" "apex_a" {
-  zone_id = data.aws_route53_zone.this.zone_id
-  name    = var.domain_name
-  type    = "A"
-  alias {
-    name                   = aws_cloudfront_distribution.this.domain_name
-    zone_id                = aws_cloudfront_distribution.this.hosted_zone_id
-    evaluate_target_health = false
-  }
-}
-
-resource "aws_route53_record" "apex_aaaa" {
-  zone_id = data.aws_route53_zone.this.zone_id
-  name    = var.domain_name
-  type    = "AAAA"
-  alias {
-    name                   = aws_cloudfront_distribution.this.domain_name
-    zone_id                = aws_cloudfront_distribution.this.hosted_zone_id
-    evaluate_target_health = false
-  }
-}
-
-resource "aws_cloudfront_function" "redirect_apex_to_www" {
-  name    = "redirect-apex-to-www"
-  runtime = "cloudfront-js-1.0"
-  comment = "301 redirect ${var.domain_name} -> ${var.subdomain}.${var.domain_name}"
-  publish = true
-  code    = <<-EOF
-function handler(event) {
-  var req  = event.request;
-  var host = req.headers.host.value.toLowerCase();
-
-  var apex = "timeandnotes.com";
-  var www  = "www.timeandnotes.com";
-
-  // Build query string from the structured object
-  function buildQuery(qs) {
-    var parts = [];
-    for (var k in qs) {
-      if (!qs.hasOwnProperty(k)) continue;
-      var entry = qs[k];
-      if (entry.multiValue && entry.multiValue.length) {
-        for (var i = 0; i < entry.multiValue.length; i++) {
-          parts.push(k + "=" + entry.multiValue[i].value);
-        }
-      } else if (entry.value !== undefined) {
-        parts.push(k + "=" + entry.value);
-      }
-    }
-    return parts.length ? ("?" + parts.join("&")) : "";
-  }
-
-  if (host === apex) {
-    var location = "https://" + www + req.uri + buildQuery(req.querystring || {});
-    return {
-      statusCode: 301,
-      statusDescription: "Moved Permanently",
-      headers: { location: { value: location } }
-    };
-  }
-  return req;
-}
-EOF
-}
-
-############################################################
-# S3 BUCKET POLICY (allow only CloudFront via OAC)
-############################################################
 data "aws_caller_identity" "current" {}
-
-# Allow GetObject ONLY when the request comes through *this* CloudFront distribution
-resource "aws_s3_bucket_policy" "site" {
-  bucket = aws_s3_bucket.site.id
-  policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [
-      {
-        Sid      = "AllowCloudFrontServicePrincipalReadOnly"
-        Effect   = "Allow"
-        Principal = {
-          Service = "cloudfront.amazonaws.com"
-        }
-        Action = ["s3:GetObject"]
-        Resource = [
-          "${aws_s3_bucket.site.arn}/*"
-        ]
-        Condition = {
-          StringEquals = {
-            "AWS:SourceArn" = "arn:aws:cloudfront::${data.aws_caller_identity.current.account_id}:distribution/${aws_cloudfront_distribution.this.id}"
-          }
-        }
-      }
-    ]
-  })
-}
-
-############################################################
-# ROUTE 53 DNS -> CloudFront
-############################################################
-resource "aws_route53_record" "a_alias" {
-  zone_id = data.aws_route53_zone.this.zone_id
-  name    = local.fqdn
-  type    = "A"
-  alias {
-    name                   = aws_cloudfront_distribution.this.domain_name
-    zone_id                = aws_cloudfront_distribution.this.hosted_zone_id
-    evaluate_target_health = false
-  }
-}
-
-resource "aws_route53_record" "aaaa_alias" {
-  zone_id = data.aws_route53_zone.this.zone_id
-  name    = local.fqdn
-  type    = "AAAA"
-  alias {
-    name                   = aws_cloudfront_distribution.this.domain_name
-    zone_id                = aws_cloudfront_distribution.this.hosted_zone_id
-    evaluate_target_health = false
-  }
-}
-
-
-variable "cloudfront_distribution_id" {
-  description = "CloudFront distribution ID to invalidate (leave empty if none)"
-  type        = string
-  default     = ""
-}
-
-# Optional: Narrow S3 permissions to a specific prefix (e.g., 'site/')
-
-# ------------------------------------------------------
-
-
-
-# 1) GitHub OIDC Provider (well-known, global)
-#    Thumbprint is for DigiCert Global Root G2 (GitHub OIDC).
-#    Ref: https://docs.github.com/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect
-
-
-# Helper locals
-
-
-# 2) Trust policy: allow GitHub Actions (this repo/branch) to assume the role via OIDC
-
-
-# 3) Permissions policy: S3 sync + CloudFront invalidation
-
 data "aws_caller_identity" "this" {}
 
 module "ci_github_oidc" {
@@ -332,4 +21,46 @@ module "ci_github_oidc" {
 
   s3_key_prefix = var.s3_key_prefix
   cloudfront_arn = local.cloudfront_arn
+}
+
+module "certificate" {
+  source = "./modules/certificate"
+
+  providers = {
+    aws           = aws
+    aws.us_east_1 = aws.us_east_1
+  }
+
+  domain_name = var.domain_name
+  fqdn = local.fqdn
+  aws_route53_zone = data.aws_route53_zone.this
+}
+
+module "s3_site" {
+  source = "./modules/s3-site"
+
+  aws_cloudfront_distribution = module.cloudfront_site.aws_cloudfront_distribution
+  aws_s3_bucket = aws_s3_bucket.site
+  aws_caller_identity = data.aws_caller_identity.current
+}
+
+module "cloudfront_site" {
+  source = "./modules/cloudfront-site"
+
+  domain_name = var.domain_name
+  subdomain = var.subdomain
+  fqdn = local.fqdn
+  policy_name_clean = local.policy_name_clean
+  aws_s3_bucket = aws_s3_bucket.site
+  aws_acm_certificate_validation = module.certificate.aws_acm_certificate_validation
+}
+
+module "dns" {
+  source = "./modules/dns"
+
+  domain_name = var.domain_name
+  fqdn = local.fqdn
+
+  aws_route53_zone = data.aws_route53_zone.this
+  aws_cloudfront_distribution = module.cloudfront_site.aws_cloudfront_distribution
 }

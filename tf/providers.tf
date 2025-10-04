@@ -1,5 +1,5 @@
 provider "aws" {
-  region = "ca-central-1"
+  region = var.region_primary
 }
 
 # CloudFront/ACM certs MUST be in us-east-1

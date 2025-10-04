@@ -2,7 +2,7 @@ output "site_domain" {
   value = local.fqdn
 }
 output "cloudfront_domain" {
-  value = aws_cloudfront_distribution.this.domain_name
+  value = module.cloudfront_site.aws_cloudfront_distribution.domain_name
 }
 
 output "github_actions_role_arn" {

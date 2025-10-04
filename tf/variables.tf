@@ -35,3 +35,8 @@ variable "s3_key_prefix" {
   type        = string
   default     = ""
 }
+
+variable "region_primary" {
+  type = string
+  default = "ca-central-1"
+}
