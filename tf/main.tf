@@ -17,7 +17,7 @@ module "ci_github_oidc" {
   github_owner  = var.github_owner
   github_repo   = var.github_repo
   github_branch = var.github_branch
-  s3_bucket_name = var.s3_bucket_name
+  s3_bucket_name = local.fqdn
 
   s3_key_prefix = var.s3_key_prefix
   cloudfront_arn = local.cloudfront_arn

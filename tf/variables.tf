@@ -25,12 +25,6 @@ variable "github_branch" {
   default     = "main"
 }
 
-variable "s3_bucket_name" {
-  description = "Target S3 bucket for the built site (e.g., www.timeandnotes.com)"
-  type        = string
-  default     = "${var.subdomain}.${var.domain_name}"
-}
-
 variable "s3_key_prefix" {
   description = "Optional key prefix within the bucket (no leading slash). Empty means bucket root."
   type        = string
