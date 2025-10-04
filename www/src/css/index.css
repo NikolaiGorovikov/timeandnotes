@@ -168,6 +168,8 @@ body {
 .time-block {
     display: grid;
     place-items: center;
+    user-select: none;
+    -webkit-user-select: none;
 }
 .time-wrap {
     white-space: nowrap;
@@ -182,6 +184,7 @@ body {
     line-height: 1;
     justify-content: center;
     user-select: none;
+    -webkit-user-select: none;
     /* main size (subject to global vertical fit scaling as well) */
     font-size: calc(var(--time-base) * var(--time-scale));
 }
@@ -423,6 +426,15 @@ body {
 body.time-resizing, body.time-resizing *{
     user-select: none !important;
     -webkit-user-select: none !important;
+}
+
+.noselect, .noselect * {
+    -webkit-user-select: none !important; /* Safari/iOS */
+    -moz-user-select: none;               /* Firefox */
+    -ms-user-select: none;                /* old IE */
+    user-select: none !important;         /* spec */
+    -webkit-touch-callout: none;          /* no long-press menu on iOS */
+    -webkit-user-drag: none;
 }
 
 .grabbing *, .grabbing{

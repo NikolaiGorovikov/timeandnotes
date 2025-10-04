@@ -4,7 +4,7 @@ export function main() {
     /* =========================
        State & constants
        ========================= */
-    const DEFAULT_NOTE_TEXT = "New notes like $x^2 \\geq 1$ will go here";
+    const DEFAULT_NOTE_TEXT = "New notes like $x^2 + y^2 \\leq 1$ will go here";
     const MAX_SIZE = 25;
     const MIN_SIZE = 8;
 
@@ -132,7 +132,7 @@ export function main() {
         h = h % 12; if (h === 0) h = 12;
         hhEl.textContent = pad2(h);
         mmEl.textContent = pad2(m);
-        ssEl.textContent = pad2(s);
+        ssEl.textContent = ":"+pad2(s);
         ampmEl.textContent = mer;
     }
 
@@ -151,7 +151,7 @@ export function main() {
 
         hhEl.textContent = pad2(h);
         mmEl.textContent = pad2(m % 60);
-        ssEl.textContent = pad2(s);
+        ssEl.textContent = ":"+pad2(s);
         ampmEl.textContent = " "; // keep slot so layout is stable; label "LEFT" added via CSS
     }
 
@@ -337,12 +337,24 @@ export function main() {
             });
         }
 
+        function selectContents(el) {
+            const range = document.createRange();
+            range.selectNodeContents(el);
+
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+        }
+
         content.addEventListener("focus", (e) => {
             // show text
             content.isFocused = true;
             if (article.dataset.default === "true") {
                 content.textContent = initialText;
-                setTimeout(() => document.execCommand("selectAll", false, null), 0);
+                try {
+                    selectContents(content);
+                }
+                catch (e) {}
             }
         });
 
