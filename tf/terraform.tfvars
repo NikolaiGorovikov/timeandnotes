@@ -1,0 +1,6 @@
+github_owner              = "NikolaiGorovikov"
+github_repo               = "timeandnotes"
+github_branch             = "main"
+s3_bucket_name            = "www.timeandnotes.com"
+domain_name               = "timeandnotes.com"
+subdomain                 = "www"
