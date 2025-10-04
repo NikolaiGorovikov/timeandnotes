@@ -82,6 +82,46 @@ data "aws_cloudfront_cache_policy" "managed_optimized" {
   name = "Managed-CachingOptimized"
 }
 
+resource "aws_wafv2_web_acl" "rate_limit" {
+  provider    = aws.us_east_1
+  name        = "rate-limit-acl"
+  description = "Rate limit requests"
+  scope       = "CLOUDFRONT"
+
+  default_action {
+    allow {}
+  }
+
+  rule {
+    name     = "LimitRequests"
+    priority = 1
+
+    action {
+      block {}
+    }
+
+    statement {
+      rate_based_statement {
+        limit              = 200
+        aggregate_key_type = "IP"
+        evaluation_window_sec = 60
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "LimitRequests"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  visibility_config {
+    cloudwatch_metrics_enabled = true
+    metric_name                = "rate-limit-acl"
+    sampled_requests_enabled   = true
+  }
+}
+
 resource "aws_cloudfront_distribution" "this" {
   enabled             = true
   is_ipv6_enabled     = true
@@ -115,9 +155,12 @@ resource "aws_cloudfront_distribution" "this" {
 
   restrictions {
     geo_restriction {
-      restriction_type = "none"
+      restriction_type = "blacklist"
+      locations = ["IR"]
     }
   }
+
+  web_acl_id = aws_wafv2_web_acl.rate_limit.arn
 
   viewer_certificate {
     acm_certificate_arn            = var.aws_acm_certificate_validation.certificate_arn

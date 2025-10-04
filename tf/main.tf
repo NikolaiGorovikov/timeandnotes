@@ -47,6 +47,11 @@ module "s3_site" {
 module "cloudfront_site" {
   source = "./modules/cloudfront-site"
 
+  providers = {
+    aws           = aws
+    aws.us_east_1 = aws.us_east_1
+  }
+
   domain_name = var.domain_name
   subdomain = var.subdomain
   fqdn = local.fqdn
