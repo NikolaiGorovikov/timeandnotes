@@ -441,6 +441,9 @@ body.time-resizing, body.time-resizing *{
     cursor: grabbing; !important;
 }
 
+
+
+
 #ampm{
     min-width: 2.5ch;
 }
@@ -467,3 +470,4 @@ body.time-resizing, body.time-resizing *{
     background-color: transparent;
     border-radius: 100px;
 }
+
