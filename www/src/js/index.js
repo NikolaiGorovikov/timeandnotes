@@ -4,7 +4,7 @@ export function main() {
     /* =========================
        State & constants
        ========================= */
-    const DEFAULT_NOTE_TEXT = "New notes like $x^2 + y^2 \\leq 1$ will go here. Hi Parth!!!";
+    const DEFAULT_NOTE_TEXT = "New notes like $x^2 + y^2 \\leq 1$ will go here.";
     const MAX_SIZE = 25;
     const MIN_SIZE = 8;
 
