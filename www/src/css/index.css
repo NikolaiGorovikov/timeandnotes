@@ -65,7 +65,7 @@ body {
     border-radius: 10px;
     border: 1px solid rgba(0,0,0,0.08);
     align-items: center;
-    opacity: 0;
+    opacity: 1;
     pointer-events: none;
     transition: opacity 150ms ease;
     backdrop-filter: blur(5px);
@@ -84,13 +84,18 @@ body {
 }
 
 #timeControls{
+    right: calc(0.7vw + 2px);
+    top: calc(0.7vw + 2px);
+    display: flex;
+    flex-direction: column;
+}
+
+#timeControls .time-controls{
     height: 24px;
     padding: 5px;
     line-height: 1;
     vertical-align: center;
     text-align: center;
-    right: calc(0.7vw + 2px);
-    top: calc(0.7vw + 2px);
 }
 
 #modeToggle{
