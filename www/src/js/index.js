@@ -4,7 +4,7 @@ export function main() {
     /* =========================
        State & constants
        ========================= */
-    const DEFAULT_NOTE_TEXT = "Max Sobota is a stinky winky";
+    const DEFAULT_NOTE_TEXT = "I love Max Sobota $G = O_a + t$";
     const MAX_SIZE = 25;
     const MIN_SIZE = 8;
 
