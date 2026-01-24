@@ -4,7 +4,7 @@ export function main() {
     /* =========================
        State & constants
        ========================= */
-    const DEFAULT_NOTE_TEXT = "tatiana hello";
+    const DEFAULT_NOTE_TEXT = "$x^2 + y^2 = 1$";
     const MAX_SIZE = 25;
     const MIN_SIZE = 8;
 
